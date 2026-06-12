@@ -173,10 +173,8 @@ function CatalogSectionContent({ params: paramsPromise }: { params: Promise<{ sl
                 setImagePreview(updated.image);
             }
 
-            if (slug === "exclusive-collection") {
-                setSuccess("Collection Published Successfully!");
-                setTimeout(() => setSuccess(null), 3000);
-            }
+            setSuccess("Changes Published Successfully!");
+            setTimeout(() => setSuccess(null), 3000);
         } catch (err) {
             setError("Failed to save changes. Verify your connection.");
         } finally {
@@ -467,30 +465,28 @@ function CatalogSectionContent({ params: paramsPromise }: { params: Promise<{ sl
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {slug === "exclusive-collection" && currentPromotion && (
-                        <button
-                            onClick={async () => {
-                                await performAutoSave(selectedIds);
-                            }}
-                            disabled={isSaving}
-                            className={`px-10 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all duration-500 shadow-lg flex items-center gap-3 active:scale-95 ${isSaving
-                                ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
-                                : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100/50 hover:shadow-indigo-200/50"
-                                }`}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <div className="h-4 w-4 border-2 border-indigo-400 border-t-transparent animate-spin rounded-full" />
-                                    <span>Syncing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4" />
-                                    <span>Save & Publish</span>
-                                </>
-                            )}
-                        </button>
-                    )}
+                    <button
+                        onClick={async () => {
+                            await performAutoSave(selectedIds);
+                        }}
+                        disabled={isSaving}
+                        className={`px-10 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all duration-500 shadow-lg flex items-center gap-3 active:scale-95 ${isSaving
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100/50 hover:shadow-indigo-200/50"
+                            }`}
+                    >
+                        {isSaving ? (
+                            <>
+                                <div className="h-4 w-4 border-2 border-indigo-400 border-t-transparent animate-spin rounded-full" />
+                                <span>Syncing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                <span>Save & Publish</span>
+                            </>
+                        )}
+                    </button>
                     {slug === "exclusive-collection" && currentPromotion && (
                         <button
                             onClick={() => handleDelete(currentPromotion.id)}
