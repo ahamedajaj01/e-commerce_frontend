@@ -59,7 +59,22 @@ export async function fetchBackofficeProductIds(
 
 
 export async function fetchBackofficeBrands(token?: string): Promise<Brand[]> {
-  return apiClient<Brand[]>("/backoffice/brands/", { token });
+  return apiClient<Brand[]>(`/backoffice/brands`, { token });
+}
+
+export async function createBrand(payload: FormData, token: string): Promise<Brand> {
+  return apiClient<Brand>(`/backoffice/brands`, {
+    method: "POST",
+    body: payload,
+    token,
+  });
+}
+
+export async function deleteBrand(id: string, token: string): Promise<void> {
+  return apiClient<void>(`/backoffice/brands/${id}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 export async function fetchBackofficeCategories(token?: string): Promise<Category[]> {
