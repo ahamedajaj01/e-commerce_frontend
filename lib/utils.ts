@@ -11,10 +11,19 @@ export function getMediaUrl(value?: string | null): string | undefined {
 
     const trimmed = value.trim();
     if (!trimmed) return undefined;
-    if (/^https?:\/\//i.test(trimmed) || /^blob:/i.test(trimmed)) return trimmed;
 
-    // Get the base API URL and extract the origin (e.g., http://localhost:8000)
-    // Media is served from the origin, not from the /api/v1/ path
+    // 1. If it's already an absolute URL (http, https, blob, or data), return as is
+    if (/^(https?:|blob:|data:)/i.test(trimmed)) {
+        return trimmed;
+    }
+
+    // 2. Handle Cloudinary specific relative paths if they somehow leak through
+    // (though our backend now sends absolute URLs)
+    if (trimmed.includes('res.cloudinary.com')) {
+        return trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+    }
+
+    // 3. Handle local media paths
     const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
     let baseOrigin = "";
 
@@ -24,19 +33,20 @@ export function getMediaUrl(value?: string | null): string | undefined {
             baseOrigin = url.origin;
         }
     } catch (e) {
-        // Fallback to simply removing /api/v1 if present
         baseOrigin = apiUrl.replace(/\/api\/v1\/?$/, "");
     }
 
+    // Clean the path
     let path = trimmed.replace(/^\/+/, "");
 
-    // If the path doesn't already start with common prefixes, add the /media/ prefix
+    // If it's already a full relative path to media, don't double-prefix
     if (!path.startsWith("media/") && !path.startsWith("static/") && !path.startsWith("products/media/")) {
         path = `media/${path}`;
     }
 
     return baseOrigin ? `${baseOrigin}/${path}` : `/${path}`;
 }
+
 
 export function getProductImage(product?: ProductSummary | null): string | undefined {
     if (!product) return undefined;
