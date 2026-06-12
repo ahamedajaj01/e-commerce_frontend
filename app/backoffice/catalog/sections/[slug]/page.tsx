@@ -70,7 +70,7 @@ function CatalogSectionContent({ params: paramsPromise }: { params: Promise<{ sl
         try {
             const [promoData, prodRes, catData] = await Promise.all([
                 fetchBackofficePromotions(token),
-                fetchBackofficeProducts(token, archivePage),
+                fetchBackofficeProducts(token, { page: archivePage, page_size: 25 }),
                 fetchBackofficeCategories(token)
             ]);
 
