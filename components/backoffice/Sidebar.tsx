@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+import { fetchBackofficeNavigationItems } from "@/lib/api/cms";
+
 interface NavItem {
   label: string;
   href: string;
@@ -19,7 +21,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const NAVIGATION: NavGroup[] = [
+const NAVIGATION_BASE: NavGroup[] = [
   {
     title: "Operations",
     items: [
@@ -43,11 +45,6 @@ const NAVIGATION: NavGroup[] = [
         icon: "👕",
         children: [
           { label: "All Products", href: "/backoffice/catalog" },
-          { label: "New Arrivals", href: "/backoffice/catalog/sections/new-arrivals" },
-          { label: "Trending Now", href: "/backoffice/catalog/sections/trending" },
-          { label: "Best Sellers", href: "/backoffice/catalog/sections/best-sellers" },
-          { label: "Homepage Selection", href: "/backoffice/catalog/sections/homepage" },
-          { label: "Exclusive Collection", href: "/backoffice/catalog/sections/exclusive-collection" },
         ]
       },
       { label: "Categories", href: "/backoffice/categories", icon: "🏷️" },
@@ -72,16 +69,17 @@ const NAVIGATION: NavGroup[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
 
   // Track expanded sub-menus (like Catalog)
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   // Track expanded high-level sections (like Operations, Commercial)
-  const [expandedSections, setExpandedSections] = useState<string[]>(NAVIGATION.map(s => s.title));
+  const [expandedSections, setExpandedSections] = useState<string[]>(NAVIGATION_BASE.map(s => s.title));
+  const [dynamicNavigation, setDynamicNavigation] = useState<NavGroup[]>(NAVIGATION_BASE);
 
   // Auto-expand the correct section and menu based on URL
   useEffect(() => {
-    const activeSection = NAVIGATION.find(s =>
+    const activeSection = dynamicNavigation.find(s =>
       s.items.some(item =>
         pathname.startsWith(item.href) ||
         item.children?.some(child => pathname.startsWith(child.href))
@@ -101,7 +99,92 @@ export function Sidebar() {
         setExpandedMenus(prev => [...prev, activeItemWithChildren.label]);
       }
     }
-  }, [pathname]);
+  }, [pathname, dynamicNavigation]);
+
+  // Fetch navigation to dynamically show/hide Catalog sub-sections
+  useEffect(() => {
+    async function syncSidebar() {
+      if (!token) return;
+      try {
+        const navItems = await fetchBackofficeNavigationItems(token);
+
+        // Flatten the nav tree to get all possible links
+        const allLinks: { label: string; href: string }[] = [];
+        const flatten = (items: any[]) => {
+          items.forEach(item => {
+            const url = item.linked_url || item.href;
+            if (url) allLinks.push({ label: item.label, href: url });
+            if (item.children) flatten(item.children);
+          });
+        };
+        flatten(navItems);
+
+        const systemMapping: Record<string, { label: string, href: string }> = {
+          "new-arrivals": { label: "New Arrivals", href: "/backoffice/catalog/sections/new-arrivals" },
+          "trending": { label: "Trending Now", href: "/backoffice/catalog/sections/trending" },
+          "best-sellers": { label: "Best Sellers", href: "/backoffice/catalog/sections/best-sellers" },
+          "homepage": { label: "Homepage Selection", href: "/backoffice/catalog/sections/homepage" },
+          "exclusive": { label: "Exclusive Collection", href: "/backoffice/catalog/sections/exclusive-collection" },
+        };
+
+        // Track seen links to avoid duplicates
+        const seenKeys = new Set<string>();
+        const dynamicChildren: { label: string; href: string }[] = [
+          { label: "All Products", href: "/backoffice/catalog" }
+        ];
+        seenKeys.add("/backoffice/catalog");
+
+        // 1. Process /collections/ links from Navbar
+        allLinks.forEach(link => {
+          const collectionMatch = link.href.match(/\/collections\/([^/]+)/);
+          if (collectionMatch) {
+            const slug = collectionMatch[1];
+            const systemEntry = systemMapping[slug];
+
+            if (systemEntry) {
+              if (!seenKeys.has(systemEntry.href)) {
+                dynamicChildren.push(systemEntry);
+                seenKeys.add(systemEntry.href);
+              }
+            } else {
+              // Custom Collection link in Nav
+              const customHref = `/backoffice/catalog/sections/${slug}`;
+              if (!seenKeys.has(customHref)) {
+                dynamicChildren.push({ label: link.label, href: customHref });
+                seenKeys.add(customHref);
+              }
+            }
+          }
+        });
+
+        // 2. Ensure "Homepage Selection" and "Exclusive Collection" are ALWAYS there even if not in Nav
+        const essentials = ["homepage", "exclusive"];
+        essentials.forEach(key => {
+          const entry = systemMapping[key];
+          if (entry && !seenKeys.has(entry.href)) {
+            dynamicChildren.push(entry);
+            seenKeys.add(entry.href);
+          }
+        });
+
+        setDynamicNavigation(prev => {
+          const next = [...prev];
+          const commercialIdx = next.findIndex(n => n.title === "Commercial");
+          if (commercialIdx > -1) {
+            const catalogIdx = next[commercialIdx].items.findIndex(i => i.label === "Catalog");
+            if (catalogIdx > -1) {
+              next[commercialIdx].items[catalogIdx].children = dynamicChildren;
+            }
+          }
+          return next;
+        });
+      } catch (e) {
+        console.warn("[Sidebar] Dynamic sync failed:", e);
+      }
+    }
+
+    syncSidebar();
+  }, [token]);
 
   const toggleSection = (title: string) => {
     setExpandedSections(prev =>
@@ -128,7 +211,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-        {NAVIGATION.map((section) => {
+        {dynamicNavigation.map((section) => {
           const isSectionExpanded = expandedSections.includes(section.title);
 
           return (
