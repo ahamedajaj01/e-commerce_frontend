@@ -1,3 +1,4 @@
+// DataTable.tsx — A reusable data table component for the backoffice interface, supporting dynamic columns, loading states, and empty states.
 "use client";
 
 import { ReactNode } from "react";
@@ -91,3 +92,4 @@ export function DataTable<T>({ data, columns, keyExtractor, onRowClick, isLoadin
         </div>
     );
 }
+
