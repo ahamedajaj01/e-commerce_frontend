@@ -216,3 +216,7 @@ export async function updateHomepageSection(id: string, payload: Partial<Homepag
 export async function deleteHomepageSection(id: string, token?: string): Promise<any> {
   return apiClient<any>(`/backoffice/cms/homepage-sections/${id}/`, { method: "DELETE", token });
 }
+
+export async function fetchBackofficeCollections(token?: string): Promise<any[]> {
+  return apiClient<any[]>("/backoffice/cms/collections/", { token });
+}

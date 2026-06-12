@@ -25,40 +25,50 @@ Every change to inventory (adjustments via the UI) is logged as a `StockMovement
 
 ## Backoffice API Endpoints
 
-### 1. Stock Report Dashboard
-Fetches the global stock overview of all variants belonging to active catalog products.
+### 1. Stock Report Dashboard (Paginated)
+Fetches a paginated, global stock overview of all variants belonging to active catalog products.
+
 - **Endpoint:** `GET /api/v1/backoffice/inventory/`
+- **Query Params:**
+  - `page` (optional, default: 1)
+  - `page_size` (optional, default: 20)
+  - `type` (optional, filters by product type)
 - **Auth:** Backoffice Staff required
-- **Rich Data Response:**
+- **Response Structure:**
   ```json
   {
       "success": true,
-      "data": [
-          {
-              "id": "v-uuid",
-              "is_stub": false,
-              "status": "SYNCHRONIZED",
-              "variant": {
+      "data": {
+          "results": [
+              {
                   "id": "uuid",
-                  "sku": "VAR-WHITE-SILK",
-                  "name": "White Silk Sari",
-                  "size": "FREESIZE",
-                  "color": "Multicolor",
-                  "price": "1200.00",
-                  "product_id": "uuid",
-                  "product_name": "White Silk Sari",
-                  "product_image": "/media/products/images/sari.jpg"
-              },
-              "available_quantity": 50,
-              "reserved_quantity": 0,
-              "is_unlimited": false,
-              "total_quantity": 50,
-              "updated_at": "2024-05-24T..."
+                  "variant": {
+                      "id": "uuid",
+                      "sku": "VAR-WHITE-SILK",
+                      "name": "White Silk Sari",
+                      "price": "1200.00",
+                      "product_id": "uuid",
+                      "product_name": "White Silk Sari"
+                  },
+                  "available_quantity": 50,
+                  "reserved_quantity": 0,
+                  "is_unlimited": false,
+                  "total_quantity": 50,
+                  "updated_at": "2024-05-24T..."
+              }
+          ],
+          "meta": {
+              "total_items": 1500,
+              "total_pages": 75,
+              "current_page": 1,
+              "page_size": 20,
+              "has_next": true,
+              "has_previous": false
           }
-      ]
+      }
   }
   ```
-  *(Note: `is_stub`, `status`, `reserved_quantity`, and `is_unlimited` are now hardcoded polyfills for frontend stability and backward compatibility).*
+  *(Note: `available_quantity`, `reserved_quantity`, and `is_unlimited` are polyfills provided for legacy frontend fields).*
 
 ### 2. Adjust Inventory (Manual Corrections)
 Manually update stock levels for a specific variant. This instantly updates the `stock_quantity` on the `ProductVariant` and logs a historical movement.

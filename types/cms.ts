@@ -50,16 +50,17 @@ export interface Announcement {
 }
 
 export interface Promotion {
-  is_active: any;
   id: string;
   title: string;
   description?: string;
   image?: string;
   images?: any[];
-  category?: string;
+  category?: string; // Target Category ID
+  brand?: string;    // Target Brand ID
   cta_text?: string;
   cta_link?: string;
   is_visible: boolean;
+  is_active?: boolean;
   products: any[];
   product_ids?: string[];
   sort_order: number;

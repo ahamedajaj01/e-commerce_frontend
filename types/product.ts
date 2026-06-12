@@ -31,6 +31,8 @@ export interface Category {
   children?: Category[];
 }
 
+
+
 export interface ProductSummary {
   id: string;
   name: string;
@@ -41,6 +43,8 @@ export interface ProductSummary {
   badge?: string;
   category?: string;         // raw UUID from backend
   category_detail?: Category; // nested category object from backend
+  brand?: string;            // raw UUID from backend
+  brand_detail?: Brand;      // nested brand object from backend
   description?: string;
   is_visible?: boolean;
   material?: string;
@@ -58,6 +62,15 @@ export interface FeaturedCollection {
   subtitle: string;
   products: ProductSummary[];
   banner_image?: string;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  description?: string;
+  is_active: boolean;
 }
 
 export type Product = ProductSummary;

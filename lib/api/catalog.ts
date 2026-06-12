@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client";
-import type { Product, Category } from "@/types/product";
+import type { Product, Category, Brand } from "@/types/product";
 
 export async function fetchProducts(params?: Record<string, string>): Promise<Product[]> {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
@@ -28,12 +28,38 @@ export async function fetchCategories(): Promise<Category[]> {
   return data?.results || (Array.isArray(data) ? data : []);
 }
 
-export async function fetchBackofficeProducts(token?: string, page: number = 1): Promise<{ results: Product[], count: number }> {
-  const data = await apiClient<any>(`/backoffice/products/?page=${page}&page_size=25`, { token });
+export async function fetchBackofficeProducts(
+  token?: string,
+  params: Record<string, any> = {}
+): Promise<{ results: Product[], count: number }> {
+  const queryParams = new URLSearchParams();
+  if (params.page) queryParams.append("page", params.page.toString());
+  if (params.page_size) queryParams.append("page_size", params.page_size.toString());
+  if (params.search) queryParams.append("search", params.search);
+  if (params.category) queryParams.append("category", params.category);
+  if (params.brand) queryParams.append("brand", params.brand);
+  if (params.stock_status) queryParams.append("stock_status", params.stock_status);
+  if (params.min_price) queryParams.append("min_price", params.min_price.toString());
+  if (params.max_price) queryParams.append("max_price", params.max_price.toString());
+
+  const data = await apiClient<any>(`/backoffice/products/?${queryParams.toString()}`, { token });
   return {
     results: data?.results || data?.data || (Array.isArray(data) ? data : []),
     count: data?.meta?.total_items || data?.total_count || data?.count || data?.total || (Array.isArray(data) ? data.length : 0)
   };
+}
+
+export async function fetchBackofficeProductIds(
+  token?: string,
+  params: Record<string, any> = {}
+): Promise<string[]> {
+  const queryParams = new URLSearchParams(params);
+  return apiClient<string[]>(`/backoffice/products/ids/?${queryParams.toString()}`, { token });
+}
+
+
+export async function fetchBackofficeBrands(token?: string): Promise<Brand[]> {
+  return apiClient<Brand[]>("/backoffice/brands/", { token });
 }
 
 export async function fetchBackofficeCategories(token?: string): Promise<Category[]> {
