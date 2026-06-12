@@ -133,6 +133,14 @@ export default function CatalogPage() {
       },
     },
     {
+      header: "Brand",
+      accessor: (p: Product) => (
+        <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wide">
+          {(p as any).brand_detail?.name || p.brand || "Private Label"}
+        </span>
+      )
+    },
+    {
       header: "Category",
       accessor: (p: Product) => (
         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">

@@ -54,7 +54,7 @@ export async function fetchBackofficeProductIds(
   params: Record<string, any> = {}
 ): Promise<string[]> {
   const queryParams = new URLSearchParams(params);
-  return apiClient<string[]>(`/backoffice/products/ids/?${queryParams.toString()}`, { token });
+  return apiClient<string[]>(`/backoffice/products/ids?${queryParams.toString()}`, { token });
 }
 
 

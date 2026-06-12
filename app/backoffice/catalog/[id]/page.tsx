@@ -4,10 +4,10 @@ import { useState, useEffect, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
-import { fetchBackofficeCategories, fetchBackofficeProducts, updateProduct } from "@/lib/api/catalog";
+import { fetchBackofficeCategories, fetchBackofficeProducts, updateProduct, fetchBackofficeBrands } from "@/lib/api/catalog";
 import { adjustInventory } from "@/lib/api/inventory";
 import { getProductImage, getMediaUrl } from "@/lib/utils";
-import type { Category, Product, ProductVariant } from "@/types/product";
+import type { Category, Product, ProductVariant, Brand } from "@/types/product";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { Copy, Plus, X, Trash2 } from "lucide-react";
 
@@ -217,6 +217,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     const [mainImage, setMainImage] = useState<string | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [brands, setBrands] = useState<Brand[]>([]);
     const [variants, setVariants] = useState<VariantRow[]>([]);
     const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
     const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
@@ -232,10 +233,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         if (!token) return;
         Promise.all([
             fetchBackofficeCategories(token),
+            fetchBackofficeBrands(token),
             fetchBackofficeProducts(token),
-        ]).then(([catsData, productsData]) => {
-            const catResults = Array.isArray(catsData) ? catsData : (catsData as any)?.results || [];
-            setCategories(catResults);
+        ]).then(([catsData, brandData, productsData]) => {
+            setCategories(Array.isArray(catsData) ? catsData : (catsData as any)?.results || []);
+            setBrands(Array.isArray(brandData) ? brandData : (brandData as any)?.results || []);
             const allProducts: Product[] = Array.isArray(productsData) ? productsData : (productsData as any)?.results || [];
             const found = allProducts.find(p => p.id === id) || null;
             if (found) {
@@ -361,6 +363,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         const description = (raw.get("description") as string)?.trim();
         const base_price = (raw.get("base_price") as string)?.trim();
         const category_id = raw.get("category_id") as string;
+        const brand_id = raw.get("brand_id") as string;
         const isVisible = raw.get("is_visible") === "true";
 
         if (name) payload.append("name", name);
@@ -370,6 +373,9 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         // CRITICAL: Only append if not empty to prevent backend 500 errors
         if (category_id && category_id !== "") {
             payload.append("category_id", category_id);
+        }
+        if (brand_id && brand_id !== "") {
+            payload.append("brand_id", brand_id);
         }
         payload.append("is_visible", isVisible ? "true" : "false");
 
@@ -626,15 +632,28 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                     <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
                         <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Classification</h2>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
-                            <select name="category_id" defaultValue={product.category_detail?.id || product.category || ""}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition">
-                                <option value="">Select a Category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
+                                <select name="category_id" defaultValue={product.category_detail?.id || product.category || ""}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition">
+                                    <option value="">Select Category</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Brand</label>
+                                <select name="brand_id" defaultValue={(product as any).brand_detail?.id || product.brand || ""}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition">
+                                    <option value="">No Brand / Private Label</option>
+                                    {brands.map((brand) => (
+                                        <option key={brand.id} value={brand.id}>{brand.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div className="space-y-2">

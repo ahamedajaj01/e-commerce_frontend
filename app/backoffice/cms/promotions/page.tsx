@@ -401,7 +401,11 @@ export default function PromotionsPage() {
                                         </select>
                                     </div>
                                     <div className="col-span-2">
-                                        <button onClick={handleBulkSelect} className="w-full h-full py-4 bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95">
+                                        <button
+                                            type="button"
+                                            onClick={handleBulkSelect}
+                                            className="w-full h-full py-4 bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95"
+                                        >
                                             Bulk Add Results
                                         </button>
                                     </div>

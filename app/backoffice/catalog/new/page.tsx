@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 import { AlertBanner } from "@/components/ui/AlertBanner";
-import { fetchBackofficeCategories, createProduct } from "@/lib/api/catalog";
+import { fetchBackofficeCategories, createProduct, fetchBackofficeBrands } from "@/lib/api/catalog";
 import { Copy, Trash2 } from "lucide-react";
-import type { Category } from "@/types/product";
+import type { Category, Brand } from "@/types/product";
 
 // ─── Predefined option lists ─────────────────────────────────────────────────
 const MATERIAL_OPTIONS = ["Georgette", "Cotton", "Silk", "Chiffon", "Linen", "Velvet", "Crepe", "Satin", "Organza", "Rayon", "Net", "Lycra"];
@@ -266,6 +266,7 @@ export default function NewProductPage() {
     const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
     const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [brands, setBrands] = useState<Brand[]>([]);
     const [variants, setVariants] = useState<VariantRow[]>([]);
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
     const [successInfo, setSuccessInfo] = useState<string | null>(null);
@@ -274,8 +275,14 @@ export default function NewProductPage() {
 
     useEffect(() => {
         if (!token) return;
-        fetchBackofficeCategories(token).then((data: any) => {
-            setCategories(Array.isArray(data) ? data : data?.results || []);
+
+        // Fetch both Categories and Brands
+        Promise.all([
+            fetchBackofficeCategories(token),
+            fetchBackofficeBrands(token)
+        ]).then(([catData, brandData]: [any, any]) => {
+            setCategories(Array.isArray(catData) ? catData : catData?.results || []);
+            setBrands(Array.isArray(brandData) ? brandData : brandData?.results || []);
         }).catch(() => { });
     }, [token]);
 
@@ -384,6 +391,9 @@ export default function NewProductPage() {
 
         const category_id = raw.get("category_id") as string;
         if (category_id) payload.append("category_id", category_id);
+
+        const brand_id = raw.get("brand_id") as string;
+        if (brand_id) payload.append("brand_id", brand_id);
 
         // Design attributes
         ["material", "sleeve", "length", "neck_line", "fit"].forEach((field) => {
@@ -630,17 +640,32 @@ export default function NewProductPage() {
                     <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
                         <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Classification</h2>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
-                            <select
-                                name="category_id"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                            >
-                                <option value="">Select a Category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
+                                <select
+                                    name="category_id"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                                >
+                                    <option value="">Select Category</option>
+                                    {categories.map((cat) => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Brand</label>
+                                <select
+                                    name="brand_id"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                                >
+                                    <option value="">No Brand / Private Label</option>
+                                    {brands.map((brand) => (
+                                        <option key={brand.id} value={brand.id}>{brand.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div className="space-y-2">

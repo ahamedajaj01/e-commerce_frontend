@@ -48,6 +48,7 @@ const NAVIGATION_BASE: NavGroup[] = [
         ]
       },
       { label: "Categories", href: "/backoffice/categories", icon: "🏷️" },
+      { label: "Brands", href: "/backoffice/brands", icon: "🛡️" },
       { label: "Campaign Merchandising", href: "/backoffice/cms/promotions", icon: "🛍️" },
       { label: "Announcement Center", href: "/backoffice/cms/announcements", icon: "📢" },
       { label: "Visual Banners", href: "/backoffice/marketing", icon: "🖼️" },
