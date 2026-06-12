@@ -17,13 +17,31 @@ export default async function StorefrontHomePage() {
   let campaignBanners: any[] = [];
   try {
     const promotions = await import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions());
-    const homePromo = promotions.find(p => p.title === "Homepage Selection");
-    if (homePromo && homePromo.products) {
+
+    // Robust multi-source discovery for 'Trending' products on homepage
+    // We check for "Homepage Selection" first, then "Trending Now" as a fallback
+    const homePromo = promotions.find(p =>
+      p.title === "Homepage Selection" ||
+      p.title === "Trending Now" ||
+      p.title.toLowerCase().replace(/\s+/g, '-') === "homepage-selection" ||
+      p.title.toLowerCase().replace(/\s+/g, '-') === "trending-now"
+    );
+
+    if (homePromo && Array.isArray(homePromo.products) && homePromo.products.length > 0) {
+      // If products are just IDs (not hydrated), we'll need to handle them or use a fallback
+      // For now, assume the Storefront API returns hydrated objects as seen in CollectionPage
       homepageProducts = homePromo.products;
+    } else {
+      // Fallback: If no curated promotion found, pull from global "Featured" flag
+      const featured = await import("@/lib/api/catalog").then(m => m.fetchFeaturedProducts());
+      homepageProducts = featured.slice(0, 8); // Show top 8
     }
 
     // Strictly fetch collections created via the Exclusive Collection dashboard
-    const exclusivePromos = promotions.filter(p => p.description === "Storefront Exclusive Collection");
+    const exclusivePromos = promotions.filter(p =>
+      p.description === "Storefront Exclusive Collection" ||
+      (p as any).slug?.includes("exclusive")
+    );
     customCollections = Array.from(new Map(exclusivePromos.map(p => [p.id, p])).values());
 
     // Campaign banners: visible promotions with an image AND a cta_link (Visual Banners)
@@ -31,10 +49,12 @@ export default async function StorefrontHomePage() {
       p.is_visible &&
       p.image &&
       p.cta_link &&
-      p.title !== "Homepage Selection"
+      !["Homepage Selection", "Trending Now", "New Arrivals", "Best Sellers"].includes(p.title)
     ).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   } catch (e) {
-    console.warn("Failed to fetch curated collections", e);
+    console.warn("Failed to fetch curated collections, attempting catalog fallback", e);
+    const featuredFallback = await import("@/lib/api/catalog").then(m => m.fetchFeaturedProducts()).catch(() => []);
+    homepageProducts = featuredFallback.slice(0, 8);
   }
 
   // Separate non-banner sections from CMS
