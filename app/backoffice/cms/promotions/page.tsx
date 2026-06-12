@@ -53,10 +53,12 @@ export default function PromotionsPage() {
             ]);
             const prArr = Array.isArray(promoData) ? promoData : (promoData as any)?.results || [];
 
-            // Filter out Visual Banners (which have cta_link/cta_text) and Announcements (no image, no products)
+            // Filter out System Sections and Visual Banners
+            const systemTitles = ["New Arrivals", "Trending Now", "Best Sellers", "Homepage Selection"];
             const saleCampaigns = prArr.filter((p: any) =>
                 !p.cta_link &&
-                p.title !== "Homepage Selection"
+                !systemTitles.some(title => p.title?.toLowerCase() === title.toLowerCase()) &&
+                p.description !== "Storefront Exclusive Collection"
             );
             setPromotions(saleCampaigns);
 
