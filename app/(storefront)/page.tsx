@@ -44,11 +44,11 @@ export default async function StorefrontHomePage() {
     );
     customCollections = Array.from(new Map(exclusivePromos.map(p => [p.id, p])).values());
 
-    // Campaign banners: visible promotions with an image AND a cta_link (Visual Banners)
+    // Campaign banners: visible promotions with an image (Visual Banners)
+    // We allow banners without CTA links to be displayed as visual-only promotions
     campaignBanners = promotions.filter(p =>
       p.is_visible &&
       p.image &&
-      p.cta_link &&
       !["Homepage Selection", "Trending Now", "New Arrivals", "Best Sellers"].includes(p.title)
     ).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   } catch (e) {
