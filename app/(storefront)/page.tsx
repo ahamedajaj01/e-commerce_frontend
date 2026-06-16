@@ -16,17 +16,20 @@ export default async function StorefrontHomePage() {
   let customCollections: any[] = [];
   let campaignBanners: any[] = [];
   try {
-    // Parallel fetch for campaigns and visual banners to ensure full storefront coverage
-    const [campaignPromos, bannerPromos] = await Promise.all([
+    // Consolidated parallel fetch for all promotion segments
+    const [campaignPromos, bannerPromos, systemPromos, exclusivePromosRaw] = await Promise.all([
       import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("CAMPAIGN")),
-      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("BANNER"))
+      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("BANNER")),
+      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("SYSTEM")),
+      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("EXCLUSIVE"))
     ]);
 
-    const promotions = [...campaignPromos, ...bannerPromos];
+    const promotions = [...campaignPromos, ...bannerPromos, ...systemPromos, ...exclusivePromosRaw];
 
     // Robust multi-source discovery for 'Trending' products on homepage
     // We check for "Homepage Selection" first, then "Trending Now" as a fallback
-    const homePromo = campaignPromos.find(p =>
+    // Discover primary homepage selection across SYSTEM and CAMPAIGN segments (for migration)
+    const homePromo = [...systemPromos, ...campaignPromos].find(p =>
       p.title === "Homepage Selection" ||
       p.title === "Trending Now" ||
       p.title.toLowerCase().replace(/\s+/g, '-') === "homepage-selection" ||
@@ -41,12 +44,13 @@ export default async function StorefrontHomePage() {
     }
 
     // Strictly fetch collections created via the Exclusive Collection dashboard
-    const exclusivePromos = campaignPromos.filter(p =>
+    // Consolidate exclusive collections from dedicated EXCLUSIVE segments and legacy CAMPAIGN fallback
+    const filteredExclusive = [...exclusivePromosRaw, ...campaignPromos].filter(p =>
       p.promotion_type === "EXCLUSIVE" ||
       p.description === "Storefront Exclusive Collection" ||
       (p as any).slug?.includes("exclusive")
     );
-    customCollections = Array.from(new Map(exclusivePromos.map(p => [p.id, p])).values());
+    customCollections = Array.from(new Map(filteredExclusive.map(p => [p.id, p])).values());
 
     // Campaign banners: visible promotions explicitly tagged as BANNER
     campaignBanners = bannerPromos.filter(p =>

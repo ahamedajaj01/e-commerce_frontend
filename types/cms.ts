@@ -64,7 +64,7 @@ export interface Promotion {
   products: any[];
   product_ids?: string[];
   slug: string;
-  promotion_type: "BANNER" | "CAMPAIGN" | "EXCLUSIVE";
+  promotion_type: "BANNER" | "CAMPAIGN" | "EXCLUSIVE" | "SYSTEM";
   sort_order: number;
 }
 

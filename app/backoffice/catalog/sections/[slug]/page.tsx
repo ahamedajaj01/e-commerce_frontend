@@ -480,6 +480,7 @@ function SectionContent({ params: paramsPromise }: { params: Promise<{ slug: str
             const payload = {
                 title: "Homepage Selection",
                 description: "System Managed: homepage",
+                promotion_type: "SYSTEM",
                 is_visible: true,
                 is_active: true,
                 product_ids: homepageSelectedIds,
@@ -509,6 +510,7 @@ function SectionContent({ params: paramsPromise }: { params: Promise<{ slug: str
             const payload = {
                 title: stdConfig.promoTitle,
                 description: `System Managed: ${slug}`,
+                promotion_type: "SYSTEM",
                 is_visible: true,
                 is_active: true,
                 product_ids: standardSelectedIds,
@@ -571,6 +573,7 @@ function SectionContent({ params: paramsPromise }: { params: Promise<{ slug: str
                 const fd = new FormData();
                 fd.append("title", title);
                 fd.append("description", "Storefront Exclusive Collection");
+                fd.append("promotion_type", "EXCLUSIVE");
                 fd.append("is_visible", "true");
                 fd.append("is_active", "true");
                 if (categoryId) fd.append("category", categoryId);
@@ -584,6 +587,7 @@ function SectionContent({ params: paramsPromise }: { params: Promise<{ slug: str
                 const payload: any = {
                     title,
                     description: "Storefront Exclusive Collection",
+                    promotion_type: "EXCLUSIVE",
                     is_visible: true,
                     is_active: true,
                     category: categoryId || null,

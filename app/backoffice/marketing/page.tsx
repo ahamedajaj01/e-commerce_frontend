@@ -55,8 +55,12 @@ export default function MarketingPage() {
             // Set campaigns for the selection dropdown
             setAllCampaigns(campaignData.filter(p => p.promotion_type === "CAMPAIGN"));
 
-            // Set our core visual banners
-            setPromotions(bannerData.filter(p => p.promotion_type === "BANNER"));
+            // Set our core visual banners (Strictly BANNER type, no system reserved titles)
+            const systemTitles = ["Homepage Selection", "Trending Now", "Best Sellers", "New Arrivals"];
+            setPromotions(bannerData.filter(p =>
+                p.promotion_type === "BANNER" &&
+                !systemTitles.includes(p.title)
+            ));
         } catch {
             setError("Failed to synchronize storefront visuals.");
         } finally {

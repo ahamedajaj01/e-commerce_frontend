@@ -94,7 +94,15 @@ export default function PromotionsPage() {
         try {
             const data = await fetchBackofficePromotions(token, "CAMPAIGN");
             const results = Array.isArray(data) ? data : (data as any).results || [];
-            const filtered = results.filter((p: any) => p.promotion_type === "CAMPAIGN");
+
+            // Hard filtering to exclude SYSTEM, BANNER, and EXCLUSIVE types
+            // Also exclude reserved system titles just in case of mis-tagging
+            const systemTitles = ["Homepage Selection", "Trending Now", "Best Sellers", "New Arrivals"];
+            const filtered = results.filter((p: any) =>
+                p.promotion_type === "CAMPAIGN" &&
+                !systemTitles.includes(p.title) &&
+                p.description !== "Storefront Exclusive Collection"
+            );
             setPromotions(filtered);
         } catch {
             setError("Failed to load campaigns.");
