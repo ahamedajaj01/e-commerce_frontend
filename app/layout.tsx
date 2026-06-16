@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { ModalProvider } from "@/providers/ModalProvider";
 import { CartProvider } from "@/providers/CartProvider";
-import Footer from "@/components/storefront/Footer";
+import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 
 export const metadata: Metadata = {
   title: "Lyra Label — Unified Commerce Platform",
@@ -19,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className="antialiased selection:bg-fuchsia-500/30">
+        <LoadingOverlay />
         <AuthProvider>
           <ModalProvider>
             <CartProvider>
