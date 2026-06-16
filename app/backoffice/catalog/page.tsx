@@ -81,7 +81,7 @@ export default function CatalogPage() {
       <div className="flex items-end justify-between border-b pb-6">
         <div className="space-y-1">
           <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Product Catalog</h1>
-          <p className="text-sm text-slate-500 font-medium">Manage your fashion inventory, commercial pricing, and global storefront visibility.</p>
+          <p className="text-sm text-slate-500 font-medium">Manage your store inventory, commercial pricing, and global storefront visibility.</p>
         </div>
         <Link href="/backoffice/catalog/new">
           <Button variant="primary" className="gap-2">

@@ -22,51 +22,28 @@ import {
 } from "lucide-react";
 import type { Category, Brand } from "@/types/product";
 
-// ─── Predefined options ──────────────────────────────────────────────────────
-const MATERIAL_OPTIONS = ["Georgette", "Cotton", "Silk", "Chiffon", "Linen", "Velvet", "Crepe", "Satin", "Organza", "Rayon", "Net", "Lycra"];
-const SLEEVE_OPTIONS = ["Sleeveless", "Short Sleeve", "3/4 Sleeve", "Full Sleeve", "Flutter Sleeves", "Bell Sleeve", "Cap Sleeve", "Off-Shoulder"];
-const LENGTH_OPTIONS = ["Under Bust", "Waist Length", "Hip Length", "Knee Length", "Midi", "Ankle Length", "Floor Length"];
-const NECKLINE_OPTIONS = ["Round Neck", "V-Neck", "Square Neck", "Sweetheart", "Halter", "Boat Neck", "Collar", "Off-Shoulder"];
-const FIT_OPTIONS = ["Regular", "Slim", "Relaxed", "Oversized", "Flared", "Bodycon", "A-Line"];
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Free Size"];
+// No hardcoded options for maximum flexibility (Clothes, Jewelry, etc.)
 
 interface VariantRow {
     id: string;
     sku: string;
-    size: string;
-    color: string;
+    label: string; // was size
+    variation: string; // was color
     price: string;
     stock_quantity: string;
     is_unlimited_stock: boolean;
 }
 
-// ─── Precision Combobox ──────────────────────────────────────────────────────
-function Combobox({ name, label, options, placeholder }: { name: string; label: string; options: string[]; placeholder?: string }) {
-    const [value, setValue] = useState("");
-    const [open, setOpen] = useState(false);
-    const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()));
-
+// ─── Direct Input Field ─────────────────────────────────────────────────────
+function TextInput({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
     return (
         <div className="space-y-1 relative">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</label>
-            <input type="hidden" name={name} value={value} />
             <input
-                value={value}
-                onChange={(e) => { setValue(e.target.value); setOpen(true); }}
-                onFocus={() => setOpen(true)}
-                onBlur={() => setTimeout(() => setOpen(false), 200)}
-                placeholder={placeholder || `Select or type...`}
+                name={name}
+                placeholder={placeholder || `Enter ${label.toLowerCase()}...`}
                 className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[12px] font-bold text-slate-900 outline-none focus:border-slate-900 transition-all placeholder:text-slate-300 h-9"
             />
-            {open && filtered.length > 0 && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-200">
-                    {filtered.map((opt) => (
-                        <button key={opt} type="button" onMouseDown={() => { setValue(opt); setOpen(false); }} className="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                            {opt}
-                        </button>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
@@ -86,8 +63,8 @@ export default function NewProductPage() {
     const [successInfo, setSuccessInfo] = useState<string | null>(null);
 
     // Bulk Tool State
-    const [bulkColor, setBulkColor] = useState("");
-    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+    const [bulkVariation, setBulkVariation] = useState("");
+    const [bulkScalesString, setBulkScalesString] = useState("");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -104,24 +81,24 @@ export default function NewProductPage() {
     }, [token]);
 
     const addVariantRow = () => {
-        setVariants([...variants, { id: crypto.randomUUID(), sku: "", size: "", color: "", price: "", stock_quantity: "0", is_unlimited_stock: false }]);
+        setVariants([...variants, { id: crypto.randomUUID(), sku: "", label: "", variation: "", price: "", stock_quantity: "0", is_unlimited_stock: false }]);
     };
 
-    const generateSmartSKU = (name: string, size: string, color: string) => {
+    const generateSmartSKU = (name: string, label: string, variation: string) => {
         const clean = (str: string) => str.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
         const p = clean(name || "PROD");
-        const c = clean(color || "");
-        const s = clean(size || "");
-        return `${p}${c ? '-' + c : ''}${s ? '-' + s : ''}`;
+        const v = clean(variation || "");
+        const l = clean(label || "");
+        return `${p}${v ? '-' + v : ''}${l ? '-' + l : ''}`;
     };
 
     const updateVariant = (id: string, field: keyof VariantRow, value: string | boolean) => {
         setVariants(variants.map(v => {
             if (v.id === id) {
                 const updated = { ...v, [field]: value };
-                if (!updated.sku && (field === "size" || field === "color")) {
+                if (!updated.sku && (field === "label" || field === "variation")) {
                     const prodName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
-                    updated.sku = generateSmartSKU(prodName, updated.size, updated.color);
+                    updated.sku = generateSmartSKU(prodName, updated.label, updated.variation);
                 }
                 return updated;
             }
@@ -130,16 +107,20 @@ export default function NewProductPage() {
     };
 
     const bulkAddVariants = () => {
-        if (!bulkColor || selectedSizes.length === 0) return;
+        const scales = bulkScalesString.split(",").map(s => s.trim()).filter(s => s !== "");
+        if (!bulkVariation || scales.length === 0) return;
+
         const prodName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
         const basePrice = (document.getElementsByName("base_price")[0] as HTMLInputElement)?.value || "";
-        const newRows = selectedSizes.map(size => ({
+
+        const newRows = scales.map(scale => ({
             id: crypto.randomUUID(),
-            sku: generateSmartSKU(prodName, size, bulkColor),
-            size, color: bulkColor, price: basePrice, stock_quantity: "0", is_unlimited_stock: false
+            sku: generateSmartSKU(prodName, scale, bulkVariation),
+            label: scale, variation: bulkVariation, price: basePrice, stock_quantity: "0", is_unlimited_stock: false
         }));
         setVariants([...variants, ...newRows]);
-        setBulkColor(""); setSelectedSizes([]);
+        setBulkVariation("");
+        setBulkScalesString("");
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -167,7 +148,13 @@ export default function NewProductPage() {
         if (imageFile) payload.append("image", imageFile);
         galleryFiles.forEach(f => payload.append("images", f));
         if (variants.length > 0) {
-            const vPayload = variants.map(({ id: _, ...v }) => ({ ...v, price: Number(v.price), stock_quantity: v.is_unlimited_stock ? 0 : Number(v.stock_quantity || 0) }));
+            const vPayload = variants.map(({ id: _, label, variation, ...v }) => ({
+                ...v,
+                size: label, // Map label back to size
+                color: variation, // Map variation back to color
+                price: Number(v.price),
+                stock_quantity: v.is_unlimited_stock ? 0 : Number(v.stock_quantity || 0)
+            }));
             payload.append("variants", JSON.stringify(vPayload));
         }
 
@@ -221,11 +208,11 @@ export default function NewProductPage() {
                                 <textarea name="description" rows={4} placeholder="Describe construction and fit details..." className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-medium outline-none focus:border-slate-900 resize-none transition-all" />
                             </div>
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5 pt-5 border-t border-slate-100">
-                                <Combobox name="material" label="Fabric / Material" options={MATERIAL_OPTIONS} />
-                                <Combobox name="sleeve" label="Sleeve Type" options={SLEEVE_OPTIONS} />
-                                <Combobox name="length" label="Garment Length" options={LENGTH_OPTIONS} />
-                                <Combobox name="neck_line" label="Neckline Style" options={NECKLINE_OPTIONS} />
-                                <Combobox name="fit" label="Intended Fit" options={FIT_OPTIONS} />
+                                <TextInput name="material" label="Primary Material" placeholder="e.g. Gold Plated / Silk" />
+                                <TextInput name="sleeve" label="Primary Detail / Type" placeholder="e.g. Stud / Sleeveless" />
+                                <TextInput name="length" label="Secondary Detail" placeholder="e.g. 50cm / Midi" />
+                                <TextInput name="neck_line" label="Styling / Connection" placeholder="e.g. Hook / V-Neck" />
+                                <TextInput name="fit" label="Standard Fit / Style" placeholder="e.g. Regular / Adjustable" />
                             </div>
                         </div>
                     </section>
@@ -243,24 +230,19 @@ export default function NewProductPage() {
                         {/* BULK ADD BAR */}
                         <div className="bg-slate-50 border border-slate-200 rounded-md p-5 flex items-center gap-6 shadow-sm">
                             <div className="flex-1 space-y-1">
-                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Matrix Color</label>
-                                <input value={bulkColor} onChange={e => setBulkColor(e.target.value)} placeholder="e.g. Ruby Red" className="w-full bg-white border border-slate-200 rounded px-3 py-1.5 text-[11px] font-bold outline-none focus:border-emerald-500 h-9" />
+                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Base Variation</label>
+                                <input value={bulkVariation} onChange={e => setBulkVariation(e.target.value)} placeholder="e.g. Gold Plated / Red" className="w-full bg-white border border-slate-200 rounded px-3 py-1.5 text-[11px] font-bold outline-none focus:border-emerald-500 h-9" />
                             </div>
                             <div className="flex-[2] space-y-1">
-                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Target Sizes</label>
-                                <div className="flex gap-1.5">
-                                    {SIZE_OPTIONS.map(s => (
-                                        <button
-                                            key={s} type="button"
-                                            onClick={() => setSelectedSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
-                                            className={`px-2.5 py-1.5 rounded text-[10px] font-bold transition-all border ${selectedSizes.includes(s) ? 'bg-slate-900 border-slate-900 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400'}`}
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
-                                </div>
+                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Target Scales / Sizes</label>
+                                <input
+                                    value={bulkScalesString}
+                                    onChange={e => setBulkScalesString(e.target.value)}
+                                    placeholder="Enter comma separated (e.g. S, M, L or 7, 8, 9)"
+                                    className="w-full bg-white border border-slate-200 rounded px-3 py-1.5 text-[11px] font-bold outline-none focus:border-emerald-500 h-9"
+                                />
                             </div>
-                            <button type="button" onClick={bulkAddVariants} disabled={!bulkColor || selectedSizes.length === 0} className="h-9 bg-emerald-600 text-white px-5 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-30 transition-all self-end">Generate</button>
+                            <button type="button" onClick={bulkAddVariants} disabled={!bulkVariation || !bulkScalesString} className="h-9 bg-emerald-600 text-white px-5 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-30 transition-all self-end">Generate Entries</button>
                         </div>
 
                         {/* DATA GRID */}
@@ -269,8 +251,8 @@ export default function NewProductPage() {
                                 <thead>
                                     <tr className="bg-slate-50 border-b">
                                         <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[25%] text-left">Technical SKU</th>
-                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[12%] text-left">Size</th>
-                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[18%] text-left">Color</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[12%] text-left">Label / Size</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[18%] text-left">Variation</th>
                                         <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[18%] text-left">Price (NPR)</th>
                                         <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[17%] text-left">Stock Qty</th>
                                         <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[10%] text-right">Actions</th>
@@ -283,8 +265,8 @@ export default function NewProductPage() {
                                         variants.map((v) => (
                                             <tr key={v.id} className="hover:bg-slate-50/40 transition-colors h-14">
                                                 <td className="px-3"><input value={v.sku} onChange={e => updateVariant(v.id, "sku", e.target.value)} placeholder="SKU-..." className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
-                                                <td className="px-3"><input value={v.size} onChange={e => updateVariant(v.id, "size", e.target.value)} placeholder="..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
-                                                <td className="px-3"><input value={v.color} onChange={e => updateVariant(v.id, "color", e.target.value)} placeholder="..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3"><input value={v.label} onChange={e => updateVariant(v.id, "label", e.target.value)} placeholder="Size..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3"><input value={v.variation} onChange={e => updateVariant(v.id, "variation", e.target.value)} placeholder="Color..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
                                                 <td className="px-3"><input type="number" value={v.price} onChange={e => updateVariant(v.id, "price", e.target.value)} placeholder="0.00" className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
                                                 <td className="px-3">
                                                     <div className="flex items-center gap-1.5 h-9">

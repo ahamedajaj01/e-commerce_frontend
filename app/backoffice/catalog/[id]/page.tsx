@@ -12,126 +12,85 @@ import { AlertBanner } from "@/components/ui/AlertBanner";
 import { Copy, Plus, X, Trash2 } from "lucide-react";
 
 // ─── Predefined option lists ─────────────────────────────────────────────────
-const MATERIAL_OPTIONS = ["Georgette", "Cotton", "Silk", "Chiffon", "Linen", "Velvet", "Crepe", "Satin", "Organza", "Rayon", "Net", "Lycra"];
-const SLEEVE_OPTIONS = ["Sleeveless", "Short Sleeve", "3/4 Sleeve", "Full Sleeve", "Flutter Sleeves", "Bell Sleeve", "Cap Sleeve", "Off-Shoulder"];
-const LENGTH_OPTIONS = ["Under Bust", "Waist Length", "Hip Length", "Knee Length", "Midi", "Ankle Length", "Floor Length"];
-const NECKLINE_OPTIONS = ["Round Neck", "V-Neck", "Square Neck", "Sweetheart", "Halter", "Boat Neck", "Collar", "Off-Shoulder"];
-const FIT_OPTIONS = ["Regular", "Slim", "Relaxed", "Oversized", "Flared", "Bodycon", "A-Line"];
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Free Size"];
-const COLOR_OPTIONS = ["Red", "Blue", "Green", "Black", "White", "Pink", "Yellow", "Purple", "Orange", "Maroon", "Navy", "Beige", "Grey", "Multicolor"];
+// No hardcoded options for maximum flexibility (Clothes, Jewelry, etc.)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface VariantRow {
     id: string;
     backendId?: string;
     sku: string;
-    size: string;
-    color: string;
+    label: string; // was size
+    variation: string; // was color
     price: string;
     stock_quantity: string;
     is_unlimited_stock: boolean;
 }
 
-// ─── Combobox ─────────────────────────────────────────────────────────────────
-function Combobox({ name, label, options, placeholder, defaultValue }: {
-    name: string; label: string; options: string[]; placeholder?: string; defaultValue?: string;
+// ─── Direct Input Field ─────────────────────────────────────────────────────
+function TextInput({ name, label, placeholder, defaultValue }: {
+    name: string; label: string; placeholder?: string; defaultValue?: string;
 }) {
-    const [value, setValue] = useState(defaultValue || "");
-    const [open, setOpen] = useState(false);
-    const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()));
-
     return (
         <div className="space-y-2 relative">
             <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">{label}</label>
-            <input type="hidden" name={name} value={value} />
             <input
-                value={value}
-                onChange={(e) => { setValue(e.target.value); setOpen(true); }}
-                onFocus={() => setOpen(true)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
-                placeholder={placeholder || `Select or type ${label}...`}
+                name={name}
+                defaultValue={defaultValue}
+                placeholder={placeholder || `Enter ${label.toLowerCase()}...`}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
             />
-            {open && filtered.length > 0 && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden max-h-48 overflow-y-auto">
-                    {filtered.map((opt) => (
-                        <button
-                            key={opt}
-                            type="button"
-                            onMouseDown={() => { setValue(opt); setOpen(false); }}
-                            className="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700 transition-colors"
-                        >
-                            {opt}
-                        </button>
-                    ))}
-                </div>
-            )}
         </div>
     );
 }
 
 // ─── Bulk Add Tool ────────────────────────────────────────────────────────────
-function BulkAddTool({ onGenerate }: { onGenerate: (color: string, sizes: string[]) => void }) {
-    const [color, setColor] = useState("");
-    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-
-    const toggleSize = (s: string) => {
-        setSelectedSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-    };
+function BulkAddTool({ onGenerate }: { onGenerate: (variation: string, scales: string[]) => void }) {
+    const [variation, setVariation] = useState("");
+    const [scalesString, setScalesString] = useState("");
 
     const handleAdd = () => {
-        if (!color || selectedSizes.length === 0) return;
-        onGenerate(color, selectedSizes);
+        const scales = scalesString.split(",").map(s => s.trim()).filter(s => s !== "");
+        if (!variation || scales.length === 0) return;
+        onGenerate(variation, scales);
         // Reset for next use
-        setColor("");
-        setSelectedSizes([]);
+        setVariation("");
+        setScalesString("");
     };
 
     return (
         <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-6 space-y-4">
             <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">Quick Bulk Add</h3>
-                <span className="text-[9px] font-bold text-fuchsia-500 bg-fuchsia-50 px-2 py-1 rounded-md">PRO TIP</span>
+                <h3 className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">Quick Bulk Entry</h3>
+                <span className="text-[9px] font-bold text-fuchsia-500 bg-fuchsia-50 px-2 py-1 rounded-md">BULK MODE</span>
             </div>
 
             <div className="grid gap-6 sm:grid-cols-12 items-end">
                 <div className="sm:col-span-4 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Common Color</label>
+                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Base Variation</label>
                     <input
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        placeholder="e.g. Emerald Green"
-                        className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                        value={variation}
+                        onChange={(e) => setVariation(e.target.value)}
+                        placeholder="e.g. Gold Plated"
+                        className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition h-[52px]"
                     />
                 </div>
-
-                <div className="sm:col-span-6 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Select Sizes</label>
-                    <div className="flex flex-wrap gap-2">
-                        {SIZE_OPTIONS.map(s => (
-                            <button
-                                key={s}
-                                type="button"
-                                onClick={() => toggleSize(s)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${selectedSizes.includes(s)
-                                    ? "bg-slate-900 text-white shadow-lg scale-105"
-                                    : "bg-white border border-slate-200 text-slate-400 hover:border-slate-300"
-                                    }`}
-                            >
-                                {s}
-                            </button>
-                        ))}
-                    </div>
+                <div className="sm:col-span-5 space-y-2">
+                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Scale Options (Comma Separated)</label>
+                    <input
+                        value={scalesString}
+                        onChange={(e) => setScalesString(e.target.value)}
+                        placeholder="e.g. 7, 8, 9 or S, M, L"
+                        className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition h-[52px]"
+                    />
                 </div>
-
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                     <button
                         type="button"
                         onClick={handleAdd}
-                        disabled={!color || selectedSizes.length === 0}
-                        className="w-full h-[47px] bg-white border-2 border-slate-950 text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed group"
+                        disabled={!variation || !scalesString}
+                        className="w-full h-[52px] bg-fuchsia-100/50 hover:bg-fuchsia-100 text-fuchsia-700 font-bold px-6 rounded-2xl text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-30 disabled:cursor-not-allowed border border-fuchsia-200/50 underline underline-offset-4 decoration-2"
                     >
-                        Generate
+                        Generate & Embed
                     </button>
                 </div>
             </div>
@@ -155,13 +114,13 @@ function VariantRowItem({ row, index, onUpdate, onRemove, onDuplicate }: {
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
             </div>
             <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Size</label>
-                <input type="text" value={row.size} onChange={(e) => onUpdate(row.id, "size", e.target.value)} placeholder="e.g. XL"
+                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Label / Size</label>
+                <input type="text" value={row.label} onChange={(e) => onUpdate(row.id, "label", e.target.value)} placeholder="e.g. XL"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
             </div>
             <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Color</label>
-                <input type="text" value={row.color} onChange={(e) => onUpdate(row.id, "color", e.target.value)} placeholder="e.g. Ruby Red"
+                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Variation</label>
+                <input type="text" value={row.variation} onChange={(e) => onUpdate(row.id, "variation", e.target.value)} placeholder="e.g. Ruby Red"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
             </div>
             <div className="col-span-6 sm:col-span-2">
@@ -257,8 +216,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                         id: crypto.randomUUID(),
                         backendId: v.id,
                         sku: v.sku || "",
-                        size: v.size || "",
-                        color: v.color || "",
+                        label: v.size || "",
+                        variation: v.color || "",
                         price: v.price?.toString() || "",
                         stock_quantity: v.stock_quantity?.toString() || "0",
                         is_unlimited_stock: v.is_unlimited_stock || false,
@@ -282,19 +241,19 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
 
     const addVariantRow = () => {
         setVariants((prev) => [...prev, {
-            id: crypto.randomUUID(), sku: "", size: "", color: "", price: "", stock_quantity: "", is_unlimited_stock: false
+            id: crypto.randomUUID(), sku: "", label: "", variation: "", price: "", stock_quantity: "", is_unlimited_stock: false
         }]);
     };
 
-    const generateSmartSKU = (name: string, size: string, color: string) => {
+    const generateSmartSKU = (name: string, label: string, variation: string) => {
         const clean = (str: string) => str.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
         const p = clean(name || "PROD");
-        const c = clean(color || "");
-        const s = clean(size || "");
+        const v = clean(variation || "");
+        const l = clean(label || "");
 
         let sku = p;
-        if (c) sku += `-${c}`;
-        if (s) sku += `-${s}`;
+        if (v) sku += `-${v}`;
+        if (l) sku += `-${l}`;
         return sku;
     };
 
@@ -302,10 +261,10 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         setVariants((prev) => prev.map((v) => {
             if (v.id === id) {
                 const updated = { ...v, [field]: value };
-                // Smart SKU suggestion: If SKU is empty and we just updated size/color/name
-                if (!updated.sku && (field === "size" || field === "color")) {
+                // Smart SKU suggestion: If SKU is empty and we just updated label/variation/name
+                if (!updated.sku && (field === "label" || field === "variation")) {
                     const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
-                    updated.sku = generateSmartSKU(productName, updated.size, updated.color);
+                    updated.sku = generateSmartSKU(productName, updated.label, updated.variation);
                 }
                 return updated;
             }
@@ -313,18 +272,18 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         }));
     };
 
-    const bulkAddVariants = (color: string, selectedSizes: string[]) => {
+    const bulkAddVariants = (variation: string, selectedScales: string[]) => {
         const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
         const basePrice = (document.getElementsByName("base_price")[0] as HTMLInputElement)?.value || "";
 
-        const newRows = selectedSizes.map(size => ({
+        const newRows = selectedScales.map(scale => ({
             id: crypto.randomUUID(),
-            color: color,
-            size: size,
+            variation: variation,
+            label: scale,
             price: basePrice,
             stock_quantity: "0",
             is_unlimited_stock: false,
-            sku: generateSmartSKU(productName, size, color)
+            sku: generateSmartSKU(productName, scale, variation)
         }));
 
         setVariants(prev => [...prev, ...newRows]);
@@ -340,7 +299,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                 ...source,
                 id: crypto.randomUUID(),
                 backendId: undefined, // Must be new for DB
-                size: "", // Clear size so user can enter new one
+                label: "", // Clear so user can enter new one
                 sku: ""   // Clear SKU to avoid duplicate SKU errors
             },
         ]);
@@ -390,11 +349,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         galleryFiles.forEach(file => payload.append("images", file));
 
         // Variants - ALWAYS send, even if empty, to ensure deletions sync to backend
-        const variantPayload = variants.map(({ id: _id, backendId, ...v }) => ({
+        const variantPayload = variants.map(({ id: _id, backendId, label, variation, ...v }) => ({
             ...(backendId ? { id: backendId } : {}),
             sku: v.sku,
-            size: v.size,
-            color: v.color,
+            size: label || "",
+            color: variation || "",
             price: Number(v.price || 0),
             stock_quantity: Number(v.stock_quantity || 0),
             is_unlimited_stock: v.is_unlimited_stock,
@@ -506,11 +465,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                             <p className="text-xs text-slate-400 font-medium mt-1">These power the storefront filters and reel-to-product linking.</p>
                         </div>
                         <div className="grid gap-5 sm:grid-cols-2">
-                            <Combobox name="material" label="Material" options={MATERIAL_OPTIONS} placeholder="e.g. Georgette" defaultValue={(product as any).material} />
-                            <Combobox name="sleeve" label="Sleeve Type" options={SLEEVE_OPTIONS} placeholder="e.g. Flutter Sleeves" defaultValue={(product as any).sleeve} />
-                            <Combobox name="length" label="Length" options={LENGTH_OPTIONS} placeholder="e.g. Midi" defaultValue={(product as any).length} />
-                            <Combobox name="neck_line" label="Neck Line" options={NECKLINE_OPTIONS} placeholder="e.g. V-Neck" defaultValue={(product as any).neck_line} />
-                            <Combobox name="fit" label="Fit" options={FIT_OPTIONS} placeholder="e.g. Regular" defaultValue={(product as any).fit} />
+                            <TextInput name="material" label="Primary Material" placeholder="e.g. Gold Plated / Silk" defaultValue={(product as any).material} />
+                            <TextInput name="sleeve" label="Primary Detail / Type" placeholder="e.g. Stud / Sleeveless" defaultValue={(product as any).sleeve} />
+                            <TextInput name="length" label="Secondary Detail" placeholder="e.g. Dangle / Midi" defaultValue={(product as any).length} />
+                            <TextInput name="neck_line" label="Styling / Connection" placeholder="e.g. Hook / V-Neck" defaultValue={(product as any).neck_line} />
+                            <TextInput name="fit" label="Standard Fit / Style" placeholder="e.g. Adjustable / Regular" defaultValue={(product as any).fit} />
                         </div>
                     </section>
 
@@ -518,8 +477,8 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                     <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                             <div>
-                                <h2 className="text-lg font-black text-slate-900">Size & Color Variants</h2>
-                                <p className="text-xs text-slate-400 font-medium mt-1">Each row is a unique purchasable unit (e.g. Red / XL).</p>
+                                <h2 className="text-lg font-black text-slate-900">Inventory Matrix</h2>
+                                <p className="text-xs text-slate-400 font-medium mt-1">Define variations for this item (e.g. Gold Plated / Universal).</p>
                             </div>
                             <button type="button" onClick={addVariantRow}
                                 className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-fuchsia-600 transition-colors">
