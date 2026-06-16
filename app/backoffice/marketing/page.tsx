@@ -47,10 +47,16 @@ export default function MarketingPage() {
         if (!token) return;
         setIsLoading(true);
         try {
-            const data = await fetchBackofficePromotions(token, "BANNER");
-            setAllCampaigns(data.filter(p => p.promotion_type === "CAMPAIGN"));
-            const bannerPromos = data.filter(p => p.promotion_type === "BANNER");
-            setPromotions(bannerPromos);
+            const [bannerData, campaignData] = await Promise.all([
+                fetchBackofficePromotions(token, "BANNER"),
+                fetchBackofficePromotions(token, "CAMPAIGN")
+            ]);
+
+            // Set campaigns for the selection dropdown
+            setAllCampaigns(campaignData.filter(p => p.promotion_type === "CAMPAIGN"));
+
+            // Set our core visual banners
+            setPromotions(bannerData.filter(p => p.promotion_type === "BANNER"));
         } catch {
             setError("Failed to synchronize storefront visuals.");
         } finally {

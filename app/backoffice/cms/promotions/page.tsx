@@ -172,6 +172,7 @@ export default function PromotionsPage() {
         setIsSaving(true);
         const payload = {
             title, slug, description,
+            promotion_type: "CAMPAIGN",
             start_date: startDate || null,
             end_date: endDate || null,
             is_visible: isPublic,
