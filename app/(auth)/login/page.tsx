@@ -10,9 +10,10 @@ import type { UserProfile } from "@/types/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const routeForRole = (user: UserProfile) => {
@@ -26,11 +27,13 @@ export default function LoginPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setIsSubmitting(true);
     try {
       const user = await login({ email, password });
       router.push(routeForRole(user));
     } catch (error) {
       setError((error as Error).message || "Invalid credentials. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -71,6 +74,15 @@ export default function LoginPage() {
                 className="w-full pl-11 pr-4 py-4 bg-slate-50 border-0 rounded-2xl text-slate-900 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-slate-950 transition-all outline-none text-sm"
               />
             </div>
+
+            <div className="flex justify-end px-1">
+              <Link
+                href="/forgot-password"
+                className="text-[11px] font-bold text-slate-400 hover:text-slate-950 transition-colors uppercase tracking-widest"
+              >
+                Forgot Password?
+              </Link>
+            </div>
           </div>
 
           {error && (
@@ -82,18 +94,11 @@ export default function LoginPage() {
           <Button
             type="submit"
             className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group"
-            disabled={isLoading}
+            loading={isSubmitting}
           >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Authenticating...</span>
-              </div>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                Sign In <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </span>
-            )}
+            <span className="flex items-center justify-center gap-2">
+              Sign In <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+            </span>
           </Button>
         </form>
 

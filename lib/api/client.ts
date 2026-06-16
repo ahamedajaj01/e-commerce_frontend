@@ -5,6 +5,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
+    login_hint?: string;
   };
 }
 
@@ -14,7 +15,12 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
 }
 
 export class ApiError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+    public loginHint?: string
+  ) {
     super(message);
     this.name = "ApiError";
   }
@@ -81,16 +87,17 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
 
     const message = extractedMessage || response.statusText || "API request failed";
     const code = errorData?.code || (response.status === 401 ? "UNAUTHORIZED" : "UNKNOWN_ERROR");
+    const loginHint = errorData?.login_hint;
 
     // Log specifics if it's an auth failure to help debugging
-    if (response.status === 401) {
-      console.warn(`[API] Auth Failure (${code}): ${message}`);
+    if (response.status === 401 || code === "NOT_AUTHENTICATED") {
+      console.warn(`[API] Auth Failure (${code}): ${message}${loginHint ? ` Hint: ${loginHint}` : ""}`);
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("auth-unauthorized"));
+        window.dispatchEvent(new CustomEvent("auth-unauthorized", { detail: { loginHint } }));
       }
     }
 
-    throw new ApiError(code, message, response.status);
+    throw new ApiError(code, message, response.status, loginHint);
   }
 
   // Pagination-Aware Unwrapping: 

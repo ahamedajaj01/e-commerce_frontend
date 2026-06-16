@@ -9,26 +9,48 @@ import {
     deleteAnnouncement,
     fetchBackofficePromotions,
 } from "@/lib/api/cms";
-import { fetchBackofficeProducts, createProduct } from "@/lib/api/catalog";
+import { fetchBackofficeProducts } from "@/lib/api/catalog";
+import { useModal } from "@/providers/ModalProvider";
+import { Button } from "@/components/ui/Button";
 import type { Announcement, Promotion } from "@/types/cms";
 import type { Product } from "@/types/product";
 import { AlertBanner } from "@/components/ui/AlertBanner";
-import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Search, X, Megaphone, ShoppingBag, Edit } from "lucide-react";
+import { getMediaUrl } from "@/lib/utils";
+import {
+    Plus,
+    Trash2,
+    Search,
+    X,
+    ExternalLink,
+    Image as ImageIcon,
+    Pencil,
+    Zap,
+    Loader2,
+    CheckCircle2,
+    ChevronDown,
+} from "lucide-react";
 
-// ── Preset heading suggestions the client can pick quickly ─────────────────
-const HEADING_PRESETS = [
-    "🔥 Clearance Sale — Up to 70% Off!",
-    "🚚 Free Shipping on Orders Above NPR 999",
-    "✨ New Arrivals Just Dropped",
-    "⏳ Limited Time Offer — Ends Sunday!",
-    "🎉 Festival Special — Extra 20% Off",
-];
+type PlacementType = "TOP_BAR" | "POPUP" | "FLOATER";
+
+const INPUT =
+    "w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition placeholder:text-slate-300";
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+    return (
+        <div className="space-y-1">
+            <label className="block text-xs font-medium text-slate-600">
+                {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+            </label>
+            {children}
+        </div>
+    );
+}
 
 export default function AnnouncementsPage() {
     const { token, isAuthenticated } = useAuth();
+    const { confirm } = useModal();
 
-    const [banners, setBanners] = useState<Announcement[]>([]);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -36,561 +58,362 @@ export default function AnnouncementsPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    // Master ON/OFF — derived from whether any banner is_visible
-    const [barEnabled, setBarEnabled] = useState(false);
-
-
-    // Add-promotion form
-    const [showForm, setShowForm] = useState(false);
+    const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [heading, setHeading] = useState("");
-    const [ctaText, setCtaText] = useState("Shop Now");
+
+    // Form State
+    const [placement, setPlacement] = useState<PlacementType>("TOP_BAR");
+    const [title, setTitle] = useState("");
+    const [ctaText, setCtaText] = useState("");
     const [redirectUrl, setRedirectUrl] = useState("");
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
-    const [productSearch, setProductSearch] = useState("");
-    const [showProductDropdown, setShowProductDropdown] = useState(false);
-    const [destinationType, setDestinationType] = useState<'product' | 'campaign' | 'url'>('product');
-    const [headingError, setHeadingError] = useState(false);
+    const [destinationType, setDestinationType] = useState<'product' | 'campaign' | 'url'>('url');
+
+    // Image Handling
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showDropdown, setShowDropdown] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
 
-    const filteredProducts = products.filter((p) =>
-        p.name.toLowerCase().includes(productSearch.toLowerCase())
-    );
-
-    const load = async () => {
+    const loadData = async () => {
         if (!token) return;
         setIsLoading(true);
         try {
-            const [bData, pData, promoData] = await Promise.all([
+            const [bRes, pRes, promoRes] = await Promise.all([
                 fetchBackofficeAnnouncements(token),
                 fetchBackofficeProducts(token),
-                fetchBackofficePromotions(token),
+                fetchBackofficePromotions(token, "CAMPAIGN"),
             ]);
-            // Only keep Announcements (which have no image)
-            const pureAnnouncements = bData.filter((b: any) => !b.image && (!b.images || b.images.length === 0));
-            setBanners(pureAnnouncements);
-            const promoArr = Array.isArray(promoData) ? promoData : (promoData as any)?.results || [];
-
-            // For the dropdown, we only want to show visual campaigns (which have images)
-            const visualPromos = promoArr.filter((p: any) =>
-                p.title !== "Homepage Selection" &&
-                p.description !== "Storefront Exclusive Collection" &&
-                (p.image || (p.images && p.images.length > 0))
-            );
-            setPromotions(visualPromos);
-
-            // Only sync the master toggle from the server when there are actual
-            // banners to read from. If the list is empty (e.g. right after
-            // toggling ON before any banner is created) keep the current state.
-            if (pureAnnouncements.length > 0) {
-                setBarEnabled(pureAnnouncements.some((b: any) => b.is_visible));
-            }
-            const pArr = Array.isArray(pData) ? pData : (pData as any)?.results || [];
-            setProducts(pArr);
+            setAnnouncements(bRes);
+            setProducts(Array.isArray(pRes) ? pRes : (pRes as any)?.results || []);
+            setPromotions(Array.isArray(promoRes) ? promoRes : (promoRes as any)?.results || []);
         } catch {
-            setError("Failed to load promotions.");
+            setError("Synchronization failed.");
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (isAuthenticated && token) load();
+        if (isAuthenticated && token) loadData();
     }, [token, isAuthenticated]);
 
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (searchRef.current && !searchRef.current.contains(e.target as Node))
-                setShowProductDropdown(false);
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-
-    // ── Master toggle: flip is_visible on ALL banners at once ─────────────────
-    const handleMasterToggle = async () => {
-        if (!token) return;
-        const nextState = !barEnabled;
-        setBarEnabled(nextState);
-        try {
-            await Promise.all(
-                banners.map((b) => updateAnnouncement(b.id, { is_visible: nextState }, token))
-            );
-            setSuccess(nextState ? "Promotions bar is now LIVE on your store!" : "Promotions bar hidden from customers.");
-            load();
-        } catch {
-            setError("Failed to update. Please try again.");
-            setBarEnabled(!nextState); // revert
-        }
-    };
-
-    // ── Per-banner toggle ─────────────────────────────────────────────────────
-    const handleSingleToggle = async (b: Announcement) => {
-        if (!token) return;
-        try {
-            await updateAnnouncement(b.id, { is_visible: !b.is_visible }, token);
-            setSuccess(`"${b.title}" ${b.is_visible ? "hidden" : "made visible"}.`);
-            load();
-        } catch {
-            setError("Failed to update.");
-        }
-    };
-
-    // ── Save promotion (Create or Update) ───────────────────────────────────
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!heading.trim()) {
-            setHeadingError(true);
-            // Scroll the heading field into view
-            document.getElementById('announcement-heading')?.focus();
-            return;
-        }
-        if (!token) return;
-        setHeadingError(false);
-        setIsSaving(true);
-        setError(null);
-        try {
-            const payload = {
-                title: heading.trim(),
-                cta_text: ctaText || undefined,
-                redirect_url: redirectUrl || undefined,
-                linked_product_id: selectedProduct?.id || undefined,
-                linked_promotion_id: selectedPromotion?.id || undefined,
-                is_visible: barEnabled,
-            };
+        if (!title.trim() || !token) return;
 
-            if (editingId) {
-                await updateAnnouncement(editingId, payload, token);
-                setSuccess("Promotion updated!");
-            } else {
-                await createAnnouncement(payload, token);
-                setSuccess("Promotion added!");
+        setIsSaving(true);
+        try {
+            const fd = new FormData();
+            fd.append("title", `[${placement}] ${title.trim()}`);
+            fd.append("cta_text", ctaText || "");
+            fd.append("redirect_url", redirectUrl || "");
+
+            if (destinationType === 'product' && selectedProduct) {
+                fd.append("linked_product_id", selectedProduct.id);
+            } else if (destinationType === 'campaign' && selectedPromotion) {
+                fd.append("linked_promotion_id", selectedPromotion.id);
             }
 
-            setHeading(""); setCtaText("Shop Now"); setRedirectUrl(""); setSelectedProduct(null); setSelectedPromotion(null); setProductSearch(""); setShowForm(false); setEditingId(null); setHeadingError(false);
-            load();
-        } catch (err: any) {
-            setError(err.message || "Failed to save promotion.");
+            fd.append("is_visible", "true");
+            if (selectedFile) fd.append("image", selectedFile);
+
+            if (editingId) {
+                await updateAnnouncement(editingId, fd as any, token);
+            } else {
+                await createAnnouncement(fd as any, token);
+            }
+            setIsFormOpen(false);
+            setEditingId(null);
+            setSuccess("Announcement saved.");
+            setTimeout(() => setSuccess(null), 3000);
+            loadData();
+        } catch {
+            setError("Failed to save.");
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleEdit = (b: Announcement) => {
+        const match = b.title.match(/^\[(TOP_BAR|POPUP|FLOATER)\] (.*)/);
         setEditingId(b.id);
-        setHeading(b.title);
-        setCtaText(b.cta_text || "Shop Now");
+        if (match) {
+            setPlacement(match[1] as PlacementType);
+            setTitle(match[2]);
+        } else {
+            setPlacement("TOP_BAR");
+            setTitle(b.title);
+        }
+
+        setCtaText(b.cta_text || "");
         setRedirectUrl(b.redirect_url || "");
         setSelectedProduct(b.linked_product || null);
         setSelectedPromotion(b.linked_promotion || null);
-        // Set the destination type based on what's linked
+
         if (b.linked_product) setDestinationType('product');
         else if (b.linked_promotion) setDestinationType('campaign');
-        else if (b.redirect_url) setDestinationType('url');
-        else setDestinationType('product');
-        setShowForm(true);
+        else setDestinationType('url');
+
+        setPreviewUrl(getMediaUrl((b as any).image) || null);
+        setIsFormOpen(true);
     };
 
-    const handleDelete = async (id: string) => {
-        if (!token || !confirm("Remove this promotion?")) return;
+    const handleDelete = (id: string) => {
+        if (!token) return;
+        confirm({
+            title: "Delete Announcement?",
+            description: "This action will permanently remove the announcement and its associated media from the storefront.",
+            confirmText: "Delete",
+            variant: "danger",
+            onConfirm: async () => {
+                try {
+                    await deleteAnnouncement(id, token);
+                    setSuccess("Deleted.");
+                    setTimeout(() => setSuccess(null), 3000);
+                    loadData();
+                } catch { setError("Delete failed."); }
+            }
+        });
+    };
+
+    const handleToggleVisibility = async (b: Announcement) => {
+        if (!token) return;
         try {
-            await deleteAnnouncement(id, token);
-            setSuccess("Promotion removed.");
-            load();
-        } catch { setError("Failed to remove."); }
+            await updateAnnouncement(b.id, { is_visible: !b.is_visible }, token);
+            loadData();
+        } catch { setError("Update failed."); }
     };
 
     return (
-        <div className="space-y-8 max-w-3xl mx-auto">
-            {error && (
-                <AlertBanner message={error} type="error" onClose={() => setError(null)} />
-            )}
-            {success && (
-                <AlertBanner message={success} type="success" onClose={() => setSuccess(null)} />
-            )}
+        <div className="max-w-[1100px] mx-auto py-8 px-6 space-y-6">
+            <AlertBanner message={error || ""} type="error" onClose={() => setError(null)} />
+            {success && <AlertBanner message={success} type="success" onClose={() => setSuccess(null)} />}
 
             {/* Header */}
-            <div className="flex items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
-                <Link href="/backoffice/dashboard" className="p-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div className="flex items-center gap-3 flex-1">
-                    <div className="p-3 bg-purple-50 rounded-2xl">
-                        <Megaphone className="w-6 h-6 text-purple-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-black text-slate-900">Promotions Bar</h1>
-                        <p className="text-xs text-slate-400 font-medium mt-0.5">The scrolling announcement customers see at the top of every page</p>
-                    </div>
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-[18px] font-semibold text-slate-900 tracking-tight">Announcement Center</h1>
+                    <p className="text-sm text-slate-500 mt-0.5">Manage banners, popups, and top-bar messages.</p>
                 </div>
-                {barEnabled && (
-                    <Link href="/backoffice/cms/promotions" className="flex items-center gap-2 px-6 py-2.5 bg-indigo-50 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition border border-indigo-100/50">
-                        <ShoppingBag className="w-3.5 h-3.5" /> Manage Sale Campaigns
-                    </Link>
-                )}
+                <Button
+                    onClick={() => {
+                        setEditingId(null); setTitle(""); setCtaText("");
+                        setPlacement("TOP_BAR"); setDestinationType('url');
+                        setSelectedFile(null); setPreviewUrl(null);
+                        setIsFormOpen(true);
+                    }}
+                    className="gap-1.5"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                    New Announcement
+                </Button>
             </div>
 
-            {/* ── MASTER ON/OFF CARD ─────────────────────────────────────── */}
-            <div className={`rounded-[2rem] border-2 p-8 transition-all duration-300 ${barEnabled
-                ? "border-emerald-400 bg-emerald-50"
-                : "border-slate-200 bg-white"
-                }`}>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Master Switch</p>
-                        <h2 className="text-2xl font-black text-slate-900">
-                            {barEnabled ? "🟢 Promotions Bar is ON" : "⚫ Promotions Bar is OFF"}
-                        </h2>
-                        <p className="text-sm font-medium text-slate-500 mt-2 max-w-md">
-                            {barEnabled
-                                ? "Customers can see your promotions right now. Toggle OFF to hide all of them instantly."
-                                : "Nothing is showing. Toggle ON to make your promotions visible to all customers."}
-                        </p>
-                    </div>
-
-                    {/* Big toggle switch */}
-                    <button
-                        onClick={handleMasterToggle}
-                        disabled={isLoading}
-                        className={`relative flex-shrink-0 h-14 w-24 rounded-full border-2 transition-all duration-300 focus:outline-none ${barEnabled
-                            ? "bg-emerald-500 border-emerald-400"
-                            : "bg-slate-200 border-slate-300"
-                            }`}
-                    >
-                        <span className={`absolute top-1.5 h-10 w-10 rounded-full bg-white shadow-lg transition-all duration-300 ${barEnabled ? "left-12" : "left-2"
-                            }`} />
-                    </button>
+            {/* Table */}
+            <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Placements</h2>
+                    <span className="text-xs text-slate-400">{announcements.length} Published</span>
                 </div>
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50/20 border-b border-slate-100">
+                            {["Banner", "Placement", "Status", "Target", ""].map((h) => (
+                                <th key={h} className="px-4 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap last:text-right">
+                                    {h}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {isLoading ? (
+                            Array(3).fill(0).map((_, i) => (
+                                <tr key={i} className="animate-pulse">
+                                    {Array(5).fill(0).map((__, j) => (
+                                        <td key={j} className="px-4 py-3"><div className="h-4 bg-slate-100 rounded w-full" /></td>
+                                    ))}
+                                </tr>
+                            ))
+                        ) : announcements.length === 0 ? (
+                            <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400">No announcements active.</td></tr>
+                        ) : (
+                            announcements.map((ann) => {
+                                const cleanTitle = ann.title.replace(/\[(TOP_BAR|POPUP|FLOATER)\] /, "");
+                                const placementType = ann.title.match(/\[(.*?)\]/)?.[1] || "TOP_BAR";
+
+                                return (
+                                    <tr key={ann.id} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded border bg-slate-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                                    {(ann as any).image ? (
+                                                        <img src={getMediaUrl((ann as any).image)} className="w-full h-full object-cover" />
+                                                    ) : <ImageIcon className="w-3.5 h-3.5 text-slate-300" />}
+                                                </div>
+                                                <span className="text-sm font-medium text-slate-900 truncate max-w-[240px]">{cleanTitle}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                                {placementType.replace("_", " ")}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium ${ann.is_visible ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                                                }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${ann.is_visible ? "bg-emerald-500" : "bg-slate-400"}`} />
+                                                {ann.is_visible ? "Live" : "Inactive"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-[11px] text-slate-500 font-medium font-mono uppercase">
+                                            {ann.linked_product ? 'Product' : ann.linked_promotion ? 'Campaign' : 'Direct Link'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEdit(ann)} title="Edit" className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button onClick={() => handleToggleVisibility(ann)} title={ann.is_visible ? "Hide" : "Show"} className={`p-1.5 rounded transition ${ann.is_visible ? "text-emerald-500 hover:bg-emerald-50" : "text-slate-400 hover:bg-slate-100"}`}>
+                                                    <Zap className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button onClick={() => handleDelete(ann.id)} title="Delete" className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
             </div>
 
-            {/* ── PROMOTIONS LIST — only visible when bar is ON ─────────── */}
-            {!barEnabled && !isLoading && (
-                <div className="rounded-[2rem] border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                    <p className="text-2xl mb-2">💤</p>
-                    <p className="text-sm font-black text-slate-500">Promotions bar is OFF</p>
-                    <p className="text-xs text-slate-400 font-medium mt-1">Toggle it ON above to manage and publish promotions.</p>
+            {/* Modal Form */}
+            {isFormOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/30" onClick={() => setIsFormOpen(false)} />
+                    <div className="relative w-full max-w-lg bg-white rounded-lg shadow-xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <h2 className="text-sm font-semibold text-slate-900">
+                                {editingId ? "Edit Announcement" : "Create Announcement"}
+                            </h2>
+                            <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-700 transition">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSave} className="px-5 py-5 space-y-5">
+                            <div className="grid grid-cols-2 gap-4">
+                                <Field label="Placement" required>
+                                    <select value={placement} onChange={e => setPlacement(e.target.value as any)} className={INPUT}>
+                                        <option value="TOP_BAR">Homepage Ticker</option>
+                                        <option value="POPUP">Store Modal (Center)</option>
+                                        <option value="FLOATER">Corner Floater</option>
+                                    </select>
+                                </Field>
+                                <Field label="Campaign Identifier" required>
+                                    <input value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Summer Sale" className={INPUT} />
+                                </Field>
+                            </div>
+
+                            <Field label="Call to Action Text">
+                                <input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="e.g. Shop Now" className={INPUT} />
+                            </Field>
+
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Target Destination</p>
+                                <div className="flex gap-1">
+                                    {(['url', 'product', 'campaign'] as const).map(t => (
+                                        <button
+                                            key={t} type="button" onClick={() => setDestinationType(t)}
+                                            className={`flex-1 py-1 px-2 rounded text-[11px] font-semibold border transition ${destinationType === t ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                        >
+                                            {t.toUpperCase()}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {destinationType === 'url' ? (
+                                    <Field label="Direct Path / URL">
+                                        <input value={redirectUrl} onChange={e => setRedirectUrl(e.target.value)} placeholder="/shop/new-arrivals" className={INPUT} />
+                                    </Field>
+                                ) : (
+                                    <div className="space-y-1 relative" ref={searchRef}>
+                                        <label className="text-xs font-medium text-slate-600">Link {destinationType}</label>
+                                        <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-1.5 bg-white focus-within:border-slate-400">
+                                            <Search className="w-3 h-3 text-slate-300" />
+                                            <input
+                                                value={searchQuery} onFocus={() => setShowDropdown(true)} onChange={e => setSearchQuery(e.target.value)}
+                                                placeholder={`Click to search ${destinationType}s...`}
+                                                className="flex-1 bg-transparent text-sm outline-none"
+                                            />
+                                        </div>
+                                        {(selectedProduct || selectedPromotion) && (
+                                            <div className="flex items-center gap-2 mt-1 px-2 py-1 bg-emerald-50 border border-emerald-100 rounded">
+                                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                                <span className="text-[11px] font-medium text-emerald-700 truncate">
+                                                    Linked: {selectedProduct?.name || selectedPromotion?.title}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {showDropdown && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-50 overflow-hidden max-h-48 overflow-y-auto">
+                                                {(destinationType === 'product' ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())) : promotions.filter(p => (p as any).title?.toLowerCase().includes(searchQuery.toLowerCase()))).map((item: any) => (
+                                                    <button
+                                                        key={item.id} type="button"
+                                                        onClick={() => {
+                                                            if (destinationType === 'product') { setSelectedProduct(item); setSelectedPromotion(null); }
+                                                            else { setSelectedPromotion(item); setSelectedProduct(null); }
+                                                            setShowDropdown(false); setSearchQuery("");
+                                                        }}
+                                                        className="w-full px-4 py-2 text-left hover:bg-slate-50 text-xs font-medium text-slate-700 border-b last:border-0"
+                                                    >
+                                                        {item.name || item.title}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <Field label="Banner Asset (Recommended for Popups)">
+                                <div className={`aspect-video rounded-md border-2 border-dashed flex flex-col items-center justify-center bg-slate-50 relative group transition-colors ${placement === 'TOP_BAR' ? 'opacity-30 cursor-not-allowed' : 'border-slate-200 hover:border-slate-400 cursor-pointer'}`}>
+                                    {previewUrl ? (
+                                        <img src={previewUrl} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="text-center">
+                                            <ImageIcon className="w-6 h-6 mx-auto mb-2 text-slate-200" />
+                                            <p className="text-[10px] font-semibold text-slate-400 uppercase">Upload Media</p>
+                                        </div>
+                                    )}
+                                    {placement !== 'TOP_BAR' && (
+                                        <input
+                                            type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*"
+                                            onChange={e => {
+                                                const f = e.target.files?.[0];
+                                                if (f) { setSelectedFile(f); setPreviewUrl(URL.createObjectURL(f)); }
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            </Field>
+
+                            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                                <Button variant="secondary" type="button" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+                                <Button type="submit" loading={isSaving}>
+                                    {editingId ? "Update Published" : "Publish to Store"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
-
-            {barEnabled && (isLoading ? (
-                <div className="flex h-32 items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                            Your Promotions ({banners.length})
-                        </h3>
-                    </div>
-
-                    {banners.length === 0 && (
-                        <div className="rounded-[2rem] border border-dashed border-slate-200 p-10 text-center bg-slate-50">
-                            <p className="text-2xl mb-2">📭</p>
-                            <p className="text-sm font-bold text-slate-400">No promotions yet.</p>
-                            <p className="text-xs text-slate-400 mt-1">Click "Add New Promotion" below to create your first one.</p>
-                        </div>
-                    )}
-
-                    <div className="space-y-3">
-                        {banners.map((b) => (
-                            <div
-                                key={b.id}
-                                className={`rounded-[1.5rem] border p-5 flex items-center gap-4 transition-all ${b.is_visible
-                                    ? "bg-white border-slate-200"
-                                    : "bg-slate-50 border-slate-100 opacity-60"
-                                    }`}
-                            >
-                                {/* Visible toggle */}
-                                <button
-                                    onClick={() => handleSingleToggle(b)}
-                                    title={b.is_visible ? "Click to hide" : "Click to show"}
-                                    className={`relative flex-shrink-0 h-7 w-12 rounded-full transition-colors duration-200 ${b.is_visible ? "bg-emerald-500" : "bg-slate-300"
-                                        }`}
-                                >
-                                    <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all duration-200 ${b.is_visible ? "left-6" : "left-1"
-                                        }`} />
-                                </button>
-
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-black text-slate-900 text-sm truncate">{b.title}</p>
-                                    <div className="flex flex-wrap gap-2 mt-1.5">
-                                        {b.cta_text && (
-                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-purple-50 text-purple-500 rounded-full">{b.cta_text}</span>
-                                        )}
-                                        {b.linked_product && (
-                                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-fuchsia-50 text-fuchsia-500 rounded-full">
-                                                🔗 {b.linked_product.name}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => handleEdit(b)}
-                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(b.id)}
-                                        className="flex-shrink-0 p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-
-            {/* ── ADD PROMOTION — only when bar is ON ───────────────────── */}
-            {barEnabled && (!showForm ? (
-                <button
-                    onClick={() => {
-                        setEditingId(null);
-                        setHeading("");
-                        setCtaText("Shop Now");
-                        setRedirectUrl("");
-                        setSelectedProduct(null);
-                        setSelectedPromotion(null);
-                        setDestinationType('product');
-                        setShowForm(true);
-                    }}
-                    className="w-full py-5 rounded-[2rem] border-2 border-dashed border-purple-300 text-purple-500 hover:border-purple-500 hover:bg-purple-50 transition font-black text-sm flex items-center justify-center gap-2"
-                >
-                    <Plus className="w-5 h-5" /> Add New Promotion
-                </button>
-            ) : (
-                <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                            {editingId ? <Edit className="w-5 h-5 text-purple-500" /> : <Plus className="w-5 h-5 text-purple-500" />}
-                            {editingId ? "Edit Promotion" : "New Promotion"}
-                        </h3>
-                        <button onClick={() => { setShowForm(false); setEditingId(null); }} className="p-2 rounded-full hover:bg-slate-100 text-slate-400 transition"><X className="w-4 h-4" /></button>
-                    </div>
-
-                    <form onSubmit={handleSave} className="space-y-5">
-
-                        {/* Heading */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Promotion Heading <span className="text-rose-400">*</span>
-                            </label>
-                            <input
-                                id="announcement-heading"
-                                value={heading}
-                                onChange={(e) => { setHeading(e.target.value); if (e.target.value.trim()) setHeadingError(false); }}
-                                placeholder="e.g. Summer Sale — 50% Off Everything!"
-                                className={`w-full rounded-2xl bg-slate-50 border p-4 text-sm font-bold focus:outline-none focus:ring-2 transition-all ${headingError
-                                    ? 'border-rose-400 ring-2 ring-rose-100 bg-rose-50 placeholder-rose-300'
-                                    : 'border-slate-100 focus:ring-purple-100'
-                                    }`}
-                            />
-                            {headingError && (
-                                <p className="text-xs font-bold text-rose-500 mt-1">⚠ Please type a heading for this promotion first.</p>
-                            )}
-                            {/* Quick preset suggestions */}
-                            <div className="flex flex-wrap gap-2 pt-1">
-                                {HEADING_PRESETS.map((p) => (
-                                    <button
-                                        key={p}
-                                        type="button"
-                                        onClick={() => setHeading(p)}
-                                        className="text-[9px] font-bold px-3 py-1.5 bg-slate-100 hover:bg-purple-50 hover:text-purple-600 text-slate-500 rounded-full transition"
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* CTA Button label */}
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Button Label (what the customer clicks)</label>
-                            <input
-                                value={ctaText}
-                                onChange={(e) => setCtaText(e.target.value)}
-                                placeholder="e.g. Shop Now / Grab the Deal"
-                                className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-100"
-                            />
-                        </div>
-
-                        {/* Link a product from catalog OR custom URL */}
-                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 space-y-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Link a Destination (Optional)</p>
-                            <p className="text-xs text-slate-400 font-medium -mt-2">Where should the customer go after clicking?</p>
-
-                            {/* Destination Type Tabs */}
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => { setDestinationType('product'); setSelectedPromotion(null); setRedirectUrl(""); }}
-                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition ${destinationType === 'product' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
-                                >
-                                    Single Product
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setDestinationType('campaign'); setSelectedProduct(null); setRedirectUrl(""); setProductSearch(""); }}
-                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition ${destinationType === 'campaign' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
-                                >
-                                    Sale Campaign
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setDestinationType('url'); setSelectedProduct(null); setSelectedPromotion(null); setProductSearch(""); }}
-                                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition ${destinationType === 'url' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
-                                >
-                                    Custom URL
-                                </button>
-                            </div>
-
-                            <div className="space-y-3" ref={searchRef}>
-
-                                {/* ── PRODUCT search ── */}
-                                {destinationType === 'product' && (
-                                    selectedProduct ? (
-                                        <div className="flex items-center justify-between bg-fuchsia-50 border border-fuchsia-100 rounded-2xl px-4 py-3">
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-fuchsia-400 mb-0.5">Target Product</p>
-                                                <p className="text-sm font-black text-fuchsia-700 uppercase tracking-tight">{selectedProduct.name}</p>
-                                            </div>
-                                            <button type="button" onClick={() => { setSelectedProduct(null); setProductSearch(""); }} className="ml-3 flex-shrink-0 p-1.5 rounded-full hover:bg-fuchsia-100 text-fuchsia-400 transition">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="relative">
-                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4">
-                                                <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                                <input
-                                                    value={productSearch}
-                                                    onChange={(e) => { setProductSearch(e.target.value); setShowProductDropdown(true); }}
-                                                    onFocus={() => setShowProductDropdown(true)}
-                                                    placeholder="Search your products by name..."
-                                                    className="flex-1 py-4 bg-transparent text-sm font-bold focus:outline-none"
-                                                />
-                                            </div>
-                                            {showProductDropdown && (
-                                                <div className="absolute z-50 mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-52 overflow-y-auto font-sans">
-                                                    {filteredProducts.length === 0 ? (
-                                                        <p className="px-6 py-8 text-xs text-slate-400 font-medium text-center">No products found.</p>
-                                                    ) : (
-                                                        filteredProducts.slice(0, 10).map((p) => (
-                                                            <button
-                                                                key={p.id}
-                                                                type="button"
-                                                                onClick={() => { setSelectedProduct(p); setProductSearch(""); setShowProductDropdown(false); }}
-                                                                className="w-full px-6 py-4 text-left hover:bg-fuchsia-50 transition border-b border-slate-50 last:border-0 flex items-center gap-4"
-                                                            >
-                                                                <div className="h-10 w-10 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
-                                                                    {p.media?.[0]?.file_url && <img src={p.media[0].file_url} className="w-full h-full object-cover" />}
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="text-sm font-black text-slate-900 truncate">{p.name}</p>
-                                                                    <p className="text-[10px] text-fuchsia-500 font-black uppercase tracking-widest mt-1">Product • NPR {p.base_price || "0"}</p>
-                                                                </div>
-                                                            </button>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                )}
-
-                                {/* ── CAMPAIGN search ── */}
-                                {destinationType === 'campaign' && (
-                                    selectedPromotion ? (
-                                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-0.5">Target Sale Campaign</p>
-                                                <p className="text-sm font-black text-emerald-700 uppercase tracking-tight">{selectedPromotion.title}</p>
-                                            </div>
-                                            <button type="button" onClick={() => setSelectedPromotion(null)} className="ml-3 flex-shrink-0 p-1.5 rounded-full hover:bg-emerald-100 text-emerald-400 transition">
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="relative">
-                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl px-4">
-                                                <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                                                <input
-                                                    value={productSearch}
-                                                    onChange={(e) => { setProductSearch(e.target.value); setShowProductDropdown(true); }}
-                                                    onFocus={() => setShowProductDropdown(true)}
-                                                    placeholder="Search sale campaigns..."
-                                                    className="flex-1 py-4 bg-transparent text-sm font-bold focus:outline-none"
-                                                />
-                                            </div>
-                                            {showProductDropdown && (
-                                                <div className="absolute z-50 mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
-                                                    {promotions.filter(p => p.title.toLowerCase().includes(productSearch.toLowerCase())).length === 0 ? (
-                                                        <p className="px-6 py-8 text-xs text-slate-400 font-medium text-center">No sale campaigns found.</p>
-                                                    ) : (
-                                                        promotions
-                                                            .filter(p => p.title.toLowerCase().includes(productSearch.toLowerCase()))
-                                                            .map(promo => (
-                                                                <button
-                                                                    key={promo.id}
-                                                                    type="button"
-                                                                    onClick={() => { setSelectedPromotion(promo); setShowProductDropdown(false); setProductSearch(""); }}
-                                                                    className="w-full px-6 py-4 text-left hover:bg-emerald-50 transition border-b border-slate-50 last:border-0 flex items-center justify-between"
-                                                                >
-                                                                    <div>
-                                                                        <p className="text-sm font-black text-slate-900">{promo.title}</p>
-                                                                        <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mt-1">Sale Campaign • {promo.products?.length || 0} Items</p>
-                                                                    </div>
-                                                                    <Plus className="w-4 h-4 text-emerald-300" />
-                                                                </button>
-                                                            ))
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                )}
-
-                                {/* ── CUSTOM URL ── */}
-                                {destinationType === 'url' && (
-                                    <div className="space-y-1.5">
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Enter a page URL</p>
-                                        <input
-                                            value={redirectUrl}
-                                            onChange={(e) => setRedirectUrl(e.target.value)}
-                                            placeholder="e.g. /sale  or  https://..."
-                                            className="w-full rounded-2xl bg-white border border-slate-200 p-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-purple-100"
-                                        />
-                                    </div>
-                                )}
-
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => { setShowForm(false); setEditingId(null); }}
-                                className="flex-1 py-4 rounded-2xl border border-slate-200 text-slate-500 text-sm font-black hover:bg-slate-50 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isSaving}
-                                className="flex-1 py-4 rounded-2xl bg-purple-600 text-white text-sm font-black shadow-lg shadow-purple-200 hover:bg-purple-700 transition disabled:opacity-50"
-                            >
-                                {isSaving ? "Saving..." : (editingId ? "Update Promotion →" : "Add Promotion →")}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            ))}
         </div>
     );
 }

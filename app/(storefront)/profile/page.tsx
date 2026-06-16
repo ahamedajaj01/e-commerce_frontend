@@ -3,7 +3,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Package, LogOut, MapPin, MessageSquare, ChevronRight, User } from "lucide-react";
+import { Package, LogOut, MapPin, MessageSquare, ChevronRight, User, Lock } from "lucide-react";
 
 export default function ProfilePage() {
     const { user, logout, isAuthenticated, isLoading } = useAuth();
@@ -69,6 +69,22 @@ export default function ProfilePage() {
                             <div>
                                 <h3 className="font-bold text-slate-900">Saved Addresses</h3>
                                 <p className="text-xs text-slate-500">Manage your delivery locations</p>
+                            </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-300" />
+                    </button>
+
+                    <button
+                        onClick={() => router.push("/profile/security")}
+                        className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 text-left transition hover:border-slate-200 hover:bg-slate-50"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="rounded-xl bg-purple-50 p-2.5 text-purple-600">
+                                <Lock className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-900">Security Settings</h3>
+                                <p className="text-xs text-slate-500">Update password and manage account security</p>
                             </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-300" />

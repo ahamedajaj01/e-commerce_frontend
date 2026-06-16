@@ -36,8 +36,37 @@ export async function fetchProfile(token: string): Promise<UserProfile> {
   } catch (error: any) {
     if (error.status === 404) {
       // Fallback to another common endpoint if the first fails
-      return apiClient<UserProfile>("/auth/profile", { token });
+      return apiClient<UserProfile>("/auth/profile/", { token });
     }
     throw error;
   }
+}
+
+export async function changePassword(token: string, old_password: string, new_password: string): Promise<{ success: boolean; message: string }> {
+  return apiClient("/auth/password/change/", {
+    method: "POST",
+    token,
+    body: { old_password, new_password },
+  });
+}
+
+export async function forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+  return apiClient("/auth/password/forgot/", {
+    method: "POST",
+    body: { email },
+  });
+}
+
+export async function verifyResetOtp(email: string, otp: string): Promise<{ reset_token: string }> {
+  return apiClient("/auth/password/verify-otp/", {
+    method: "POST",
+    body: { email, otp },
+  });
+}
+
+export async function resetPassword(reset_token: string, new_password: string): Promise<{ success: boolean; message: string }> {
+  return apiClient("/auth/password/reset/", {
+    method: "POST",
+    body: { reset_token, new_password },
+  });
 }

@@ -63,6 +63,8 @@ export interface Promotion {
   is_active?: boolean;
   products: any[];
   product_ids?: string[];
+  slug: string;
+  promotion_type: "BANNER" | "CAMPAIGN" | "EXCLUSIVE";
   sort_order: number;
 }
 

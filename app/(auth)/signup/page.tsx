@@ -100,12 +100,14 @@ export default function SignupPage() {
               />
             </div>
             {error && <p className="text-xs font-bold text-red-500 uppercase tracking-wider text-center">{error}</p>}
-            <Button type="submit" className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group" disabled={isLoading}>
-              {isLoading ? "Sending..." : (
-                <span className="flex items-center gap-2">
-                  Get Started <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </span>
-              )}
+            <Button
+              type="submit"
+              className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group"
+              loading={isLoading}
+            >
+              <span className="flex items-center gap-2">
+                Get Started <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
             </Button>
           </form>
         )}
@@ -124,8 +126,12 @@ export default function SignupPage() {
               />
             </div>
             {error && <p className="text-xs font-bold text-red-500 uppercase tracking-wider text-center">{error}</p>}
-            <Button type="submit" className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200" disabled={isLoading}>
-              {isLoading ? "Verifying..." : "Verify Code"}
+            <Button
+              type="submit"
+              className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
+              loading={isLoading}
+            >
+              Verify Code
             </Button>
             <button
               type="button"
@@ -154,12 +160,14 @@ export default function SignupPage() {
               />
             </div>
             {error && <p className="text-xs font-bold text-red-500 uppercase tracking-wider text-center">{error}</p>}
-            <Button type="submit" className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group" disabled={isLoading}>
-              {isLoading ? "Creating..." : (
-                <span className="flex items-center gap-2">
-                  Complete Signup <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                </span>
-              )}
+            <Button
+              type="submit"
+              className="w-full py-7 rounded-full bg-slate-950 text-white font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 group"
+              loading={isLoading}
+            >
+              <span className="flex items-center gap-2">
+                Complete Signup <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </span>
             </Button>
           </form>
         )}

@@ -11,15 +11,26 @@ import {
 import type { Promotion } from "@/types/cms";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { getMediaUrl } from "@/lib/utils";
-import Link from "next/link";
 import {
-    ArrowLeft, Image as ImageIcon, Plus, Trash2,
-    Save, Sparkles, Eye, EyeOff, MoveUp, Edit2, X
+    Plus,
+    Trash2,
+    Search,
+    X,
+    ExternalLink,
+    Image as ImageIcon,
+    Filter,
+    ArrowRight,
+    Eye,
+    EyeOff,
+    Edit,
+    ChevronDown,
+    ArrowUpCircle
 } from "lucide-react";
 
 export default function MarketingPage() {
     const { token, isAuthenticated } = useAuth();
     const [promotions, setPromotions] = useState<Promotion[]>([]);
+    const [allCampaigns, setAllCampaigns] = useState<Promotion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -30,21 +41,18 @@ export default function MarketingPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [ctaLink, setCtaLink] = useState("");
 
     const loadData = async () => {
         if (!token) return;
         setIsLoading(true);
         try {
-            const data = await fetchBackofficePromotions(token);
-            // Filter out system promotions AND Announcements (Announcements lack images)
-            const bannerPromos = data.filter(p =>
-                p.description !== "Storefront Exclusive Collection" &&
-                p.title !== "Homepage Selection" &&
-                (p.image || (p.images && p.images.length > 0))
-            );
+            const data = await fetchBackofficePromotions(token, "BANNER");
+            setAllCampaigns(data.filter(p => p.promotion_type === "CAMPAIGN"));
+            const bannerPromos = data.filter(p => p.promotion_type === "BANNER");
             setPromotions(bannerPromos);
-        } catch (err) {
-            setError("Failed to load campaign data.");
+        } catch {
+            setError("Failed to synchronize storefront visuals.");
         } finally {
             setIsLoading(false);
         }
@@ -54,338 +62,241 @@ export default function MarketingPage() {
         if (isAuthenticated && token) loadData();
     }, [token, isAuthenticated]);
 
-    const openCreate = () => {
-        setEditingPromo(null);
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        setIsCreating(true);
-    };
-
-    const openEdit = (promo: Promotion) => {
-        setEditingPromo(promo);
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        setIsCreating(true);
-    };
-
-    const closeForm = () => {
-        setEditingPromo(null);
-        setIsCreating(false);
-        setSelectedFile(null);
-        setPreviewUrl(null);
-    };
-
     const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!token) return;
 
-        const form = e.currentTarget;
-        const formData = new FormData(form);
-
+        const formData = new FormData(e.currentTarget);
         if (!editingPromo && !selectedFile) {
-            setError("Please select a campaign image to launch.");
+            setError("Please upload a banner creative.");
             return;
         }
 
         setIsSaving(true);
-        setError(null);
-
         try {
             const fd = new FormData();
             fd.append("title", formData.get("title") as string);
+            fd.append("promotion_type", "BANNER");
             fd.append("description", formData.get("description") as string || "");
             fd.append("sort_order", formData.get("sort_order") as string || "0");
             fd.append("is_visible", formData.get("is_visible") === "on" ? "true" : "false");
             fd.append("cta_text", formData.get("cta_text") as string || "");
-            fd.append("cta_link", formData.get("cta_link") as string || "");
+            fd.append("cta_link", ctaLink || formData.get("cta_link") as string || "");
 
-            if (selectedFile && selectedFile.size > 0) {
-                fd.append("image", selectedFile);
-            }
+            if (selectedFile) fd.append("image", selectedFile);
 
-            if (editingPromo) {
-                await updatePromotion(editingPromo.id, fd, token);
-                setSuccess("Campaign banner updated!");
+            if (editingId) {
+                await updatePromotion(editingId, fd, token);
+                setSuccess("Banner updated.");
             } else {
                 await createPromotion(fd, token);
-                setSuccess("New campaign banner launched!");
+                setSuccess("Banner deployed.");
             }
-
-            closeForm();
+            setIsCreating(false);
+            setEditingPromo(null);
             loadData();
-            setTimeout(() => setSuccess(null), 3000);
-        } catch (err: any) {
-            console.error("Save Error:", err);
-            setError(err.message || "Failed to save banner.");
+        } catch {
+            setError("Failed to save banner.");
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!token || !confirm("Delete this campaign banner?")) return;
-        try {
-            await deletePromotion(id, token);
-            setSuccess("Banner removed.");
-            loadData();
-        } catch { setError("Failed to delete."); }
-    };
-
-    const handleToggleVisibility = async (promo: Promotion) => {
-        if (!token) return;
-        try {
-            await updatePromotion(promo.id, { is_visible: !promo.is_visible }, token);
-            loadData();
-        } catch { setError("Failed to update visibility."); }
-    };
-
-    if (isLoading) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-fuchsia-500 border-t-transparent" />
-            </div>
-        );
-    }
+    const editingId = editingPromo?.id;
 
     return (
-        <div className="space-y-8 max-w-6xl mx-auto pb-20">
+        <div className="max-w-[1400px] mx-auto py-8 px-8 space-y-10 animate-in fade-in duration-300">
             {error && <AlertBanner message={error} type="error" onClose={() => setError(null)} />}
             {success && <AlertBanner message={success} type="success" onClose={() => setSuccess(null)} />}
 
-            {/* Header */}
-            <div className="flex items-center justify-between bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-6">
-                    <div className="p-4 bg-fuchsia-100 rounded-3xl">
-                        <Sparkles className="w-8 h-8 text-fuchsia-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Campaign Banners</h1>
-                        <p className="text-sm font-medium text-slate-500 mt-1">
-                            Manage hero promotions and storefront campaign banners.
-                        </p>
-                    </div>
+            {/* HEADER */}
+            <div className="flex items-end justify-between border-b pb-6">
+                <div className="space-y-1">
+                    <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Visual Merchandising</h1>
+                    <p className="text-sm text-slate-500 font-medium">Curate hero promotions and interactive banners for your website storefront.</p>
                 </div>
                 {!isCreating && (
                     <button
-                        onClick={openCreate}
-                        className="flex items-center gap-2 py-4 px-8 rounded-2xl bg-fuchsia-600 text-white text-xs uppercase font-black tracking-widest hover:bg-fuchsia-700 transition shadow-lg shadow-fuchsia-100"
+                        onClick={() => {
+                            setEditingPromo(null); setPreviewUrl(null);
+                            setSelectedFile(null); setCtaLink(""); setIsCreating(true);
+                        }}
+                        className="bg-slate-900 text-white px-4 py-2.5 rounded-md text-sm font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm"
                     >
-                        <Plus className="w-4 h-4" /> New Campaign →
+                        <Plus className="w-4 h-4" /> Publish Banner
                     </button>
                 )}
             </div>
 
-            {/* Create / Edit Form */}
-            {isCreating && (
-                <div className="bg-white border border-slate-200 rounded-[3rem] p-10 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center justify-between mb-10">
-                        <h2 className="text-2xl font-black text-slate-900">
-                            {editingPromo ? "Edit Campaign" : "Design New Campaign"}
-                        </h2>
-                        <button onClick={closeForm} className="p-3 rounded-full hover:bg-slate-50 text-slate-400 transition">
-                            <X className="w-6 h-6" />
-                        </button>
+            {/* MANAGEMENT TABLE */}
+            {!isCreating && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Visual Banners</h2>
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                            <input placeholder="Filter visual assets..." className="pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-medium w-48 outline-none" />
+                        </div>
                     </div>
 
-                    <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                        {/* Left: Text Fields */}
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Campaign Title</label>
-                                <input
-                                    name="title"
-                                    defaultValue={editingPromo?.title}
-                                    required
-                                    placeholder="e.g. SUMMER BLOOMS ARE NEAR"
-                                    className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-fuchsia-50 transition-all"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Description / Lead Line</label>
-                                <textarea
-                                    name="description"
-                                    defaultValue={editingPromo?.description}
-                                    placeholder="Light fabrics. Fresh prints. New arrivals"
-                                    rows={3}
-                                    className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm font-bold focus:outline-none focus:ring-4 focus:ring-fuchsia-50 transition-all"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Button Text</label>
-                                    <input
-                                        name="cta_text"
-                                        defaultValue={editingPromo?.cta_text || "Discover Now"}
-                                        className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm font-bold focus:outline-none"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Redirect URL</label>
-                                    <input
-                                        name="cta_link"
-                                        defaultValue={editingPromo?.cta_link || ""}
-                                        placeholder="/collections/new-arrivals"
-                                        className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm font-bold focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Sort Order</label>
-                                    <input
-                                        name="sort_order"
-                                        type="number"
-                                        defaultValue={editingPromo?.sort_order ?? 0}
-                                        className="w-full rounded-2xl bg-slate-50 border border-slate-100 p-5 text-sm font-bold focus:outline-none"
-                                    />
-                                </div>
-                                <div className="flex flex-col justify-end space-y-2">
-                                    <label className="flex items-center gap-3 cursor-pointer p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition">
-                                        <input
-                                            name="is_visible"
-                                            type="checkbox"
-                                            defaultChecked={editingPromo?.is_visible ?? true}
-                                            className="w-4 h-4 accent-emerald-500"
-                                        />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Visible on Store</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right: Image */}
-                        <div className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 ml-1">Campaign Visual (High-Res Image)</label>
-                                <div className="aspect-[4/3] rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden relative group">
-                                    {(previewUrl || editingPromo?.image) ? (
-                                        <img
-                                            src={previewUrl || getMediaUrl(editingPromo?.image)}
-                                            className="w-full h-full object-cover"
-                                            alt="Preview"
-                                        />
-                                    ) : (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
-                                            <ImageIcon className="w-12 h-12 mb-2" />
-                                            <p className="text-[10px] font-black uppercase tracking-widest">No Image Selected</p>
-                                        </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <label className="px-6 py-3 bg-white rounded-full text-[10px] font-black uppercase tracking-widest cursor-pointer hover:scale-105 transition">
-                                            {previewUrl || editingPromo?.image ? "Change Image" : "Upload Image"}
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                className="hidden"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        setSelectedFile(file);
-                                                        setPreviewUrl(URL.createObjectURL(file));
-                                                    }
-                                                }}
-                                            />
-                                        </label>
-                                    </div>
-                                </div>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-3 text-center">Recommended: 1920×1080px or higher</p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isSaving}
-                                className="w-full py-6 rounded-[2rem] bg-slate-900 text-white text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-200 hover:bg-slate-800 transition disabled:opacity-50"
-                            >
-                                {isSaving ? "Finalizing Campaign..." : editingPromo ? "Update Live Banner →" : "Launch Campaign Banner →"}
-                            </button>
-                        </div>
-                    </form>
+                    <div className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50 border-b">
+                                    <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Creative Preview</th>
+                                    <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Internal Label</th>
+                                    <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
+                                    <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Priority</th>
+                                    <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {isLoading ? (
+                                    <tr><td colSpan={5} className="px-6 py-20 text-center text-sm text-slate-400 font-medium tracking-tight">Syncing visual library...</td></tr>
+                                ) : promotions.length === 0 ? (
+                                    <tr><td colSpan={5} className="px-6 py-20 text-center text-sm text-slate-400 font-medium tracking-tight">No active visual banners.</td></tr>
+                                ) : (
+                                    promotions.map((p) => (
+                                        <tr key={p.id} className="hover:bg-slate-50/30 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <div className="w-24 aspect-[21/9] rounded-md border bg-slate-50 overflow-hidden shrink-0">
+                                                    {p.image && <img src={getMediaUrl(p.image)} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-[13px] font-bold text-slate-900 block">{p.title}</span>
+                                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{p.cta_text || 'No CTA Label'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {p.is_visible ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100">Live</span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-50 text-slate-400 text-[10px] font-bold border border-slate-200">Draft</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-900">
+                                                    <ArrowUpCircle className={`w-3.5 h-3.5 ${p.sort_order === 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
+                                                    {p.sort_order}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button onClick={() => { setEditingPromo(p); setCtaLink(p.cta_link || ""); setIsCreating(true); }} className="text-[11px] font-bold text-slate-950 hover:underline">Edit</button>
+                                                    <button onClick={() => deletePromotion(p.id, token!).then(() => loadData())} className="text-[11px] font-bold text-rose-600 hover:underline">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
-            {/* Promotions Grid */}
-            {!isCreating && (
-                <div className="grid gap-8">
-                    {promotions.length === 0 ? (
-                        <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-20 text-center">
-                            <ImageIcon className="w-16 h-16 mx-auto text-slate-100 mb-6" />
-                            <h3 className="text-xl font-black text-slate-300 uppercase tracking-widest">No Active Campaigns</h3>
-                            <p className="text-sm text-slate-400 font-medium mt-2">Create your first hero banner to engage customers.</p>
-                            <button
-                                onClick={openCreate}
-                                className="mt-8 px-10 py-4 rounded-2xl bg-fuchsia-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-fuchsia-700 transition"
-                            >
-                                <Plus className="w-3 h-3 inline mr-2" /> New Campaign
-                            </button>
-                        </div>
-                    ) : (
-                        promotions.map((promo) => (
-                            <div key={promo.id} className="group relative bg-white border border-slate-200 rounded-[3rem] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-500">
-                                <div className="grid lg:grid-cols-5 h-[280px]">
-                                    <div className="lg:col-span-2 relative overflow-hidden bg-slate-100">
-                                        {promo.image ? (
-                                            <img
-                                                src={getMediaUrl(promo.image)}
-                                                className="w-full h-full object-cover transition duration-700 group-hover:scale-110"
-                                                alt={promo.title}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <ImageIcon className="w-12 h-12 text-slate-200" />
-                                            </div>
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none" />
+            {/* PUBLISHING FORM */}
+            {isCreating && (
+                <div className="max-w-4xl animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-[18px] font-bold text-slate-900">{editingPromo ? 'Edit Visual Banner' : 'Publish New Visual Asset'}</h2>
+                        <button onClick={() => setIsCreating(false)} className="text-slate-400 hover:text-slate-900"><X className="w-5 h-5" /></button>
+                    </div>
+
+                    <form onSubmit={handleSave} className="bg-white border rounded-lg shadow-sm">
+                        <div className="p-8 space-y-10 divide-y divide-slate-100">
+                            {/* SECTION 1: IDENTITY */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div className="space-y-1 pt-2">
+                                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Banner Context</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Define the primary messaging and sorting priority.</p>
+                                </div>
+                                <div className="md:col-span-2 space-y-5">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Banner Headline</label>
+                                        <input name="title" defaultValue={editingPromo?.title} required placeholder="The Summer Collection" className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold text-slate-900 outline-none" />
                                     </div>
-                                    <div className="lg:col-span-3 p-10 flex flex-col justify-center relative">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${promo.is_visible ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"}`}>
-                                                {promo.is_visible ? "● Live" : "○ Hidden"}
-                                            </span>
-                                            <span className="px-3 py-1 bg-fuchsia-50 text-fuchsia-600 rounded-full text-[9px] font-black uppercase tracking-widest">Campaign</span>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Description (Sub-header)</label>
+                                            <input name="description" defaultValue={editingPromo?.description} className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold outline-none" />
                                         </div>
-                                        <h3 className="text-3xl font-black text-slate-900 mb-2">{promo.title}</h3>
-                                        {promo.description && (
-                                            <p className="text-sm font-medium text-slate-400 line-clamp-2">{promo.description}</p>
-                                        )}
-
-                                        <div className="absolute top-8 right-8 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
-                                            <button
-                                                onClick={() => handleToggleVisibility(promo)}
-                                                className="p-3 bg-white border border-slate-100 hover:border-emerald-200 text-slate-400 hover:text-emerald-600 rounded-2xl transition shadow-sm"
-                                                title={promo.is_visible ? "Hide" : "Show"}
-                                            >
-                                                {promo.is_visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                            </button>
-                                            <button
-                                                onClick={() => openEdit(promo)}
-                                                className="p-3 bg-white border border-slate-100 hover:border-amber-200 text-slate-400 hover:text-amber-600 rounded-2xl transition shadow-sm"
-                                                title="Edit"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(promo.id)}
-                                                className="p-3 bg-white border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-2xl transition shadow-sm"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-
-                                        <div className="mt-6 flex items-center gap-4">
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                <MoveUp className="w-3 h-3" />
-                                                Order: {promo.sort_order}
-                                            </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Priority Order</label>
+                                            <input name="sort_order" type="number" defaultValue={editingPromo?.sort_order ?? 0} className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold outline-none" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    )}
+
+                            {/* SECTION 2: LINKAGE */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10">
+                                <div className="space-y-1 pt-2">
+                                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Storefront Target</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Where should the user go when clicking this banner?</p>
+                                </div>
+                                <div className="md:col-span-2 space-y-5">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Button Text</label>
+                                            <input name="cta_text" defaultValue={editingPromo?.cta_text || 'Explore'} className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold outline-none" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Destination Path</label>
+                                            <input name="cta_link" value={ctaLink} onChange={e => setCtaLink(e.target.value)} placeholder="/shop-now" className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold outline-none" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Quick Link to Campaign</label>
+                                        <select onChange={e => setCtaLink(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold outline-none">
+                                            <option value="">Manually entering path...</option>
+                                            {allCampaigns.map(c => <option key={c.id} value={`/promotions/${(c as any).slug || c.id}`}>→ {c.title}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION 3: VISUAL ASSET */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10">
+                                <div className="space-y-1 pt-2">
+                                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Creative Asset</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Recommended resolution: 1920 × 1080 (16:9 ratio).</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <div className="aspect-[21/9] rounded-md border-2 border-dashed flex items-center justify-center bg-slate-50 relative group transition-all hover:bg-white hover:border-slate-300">
+                                        {(previewUrl || editingPromo?.image) ? (
+                                            <img src={previewUrl || getMediaUrl(editingPromo?.image)} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="text-center">
+                                                <ImageIcon className="w-8 h-8 mx-auto text-slate-200 mb-2" />
+                                                <p className="text-[10px] font-black uppercase text-slate-400">Click to upload banner</p>
+                                            </div>
+                                        )}
+                                        <input
+                                            type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={e => {
+                                                const f = e.target.files?.[0];
+                                                if (f) { setSelectedFile(f); setPreviewUrl(URL.createObjectURL(f)); }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="mt-6 flex items-center gap-3 bg-slate-50 p-4 rounded-md border border-slate-200">
+                                        <input type="checkbox" name="is_visible" defaultChecked={editingPromo?.is_visible ?? true} className="w-5 h-5 accent-slate-900 h-4 w-4" />
+                                        <span className="text-[11px] font-bold text-slate-900 uppercase">Live on Storefront</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50/50 p-6 flex justify-end gap-2 border-t">
+                            <button type="button" onClick={() => setIsCreating(false)} className="px-5 py-2 text-[12px] font-bold text-slate-500 uppercase tracking-tight">Cancel</button>
+                            <button type="submit" disabled={isSaving} className="bg-slate-950 text-white px-10 py-2 rounded-md text-[12px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-sm">
+                                {isSaving ? 'Processing...' : 'Publish Banner'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
         </div>

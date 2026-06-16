@@ -32,9 +32,10 @@ export async function fetchDiscoveryFeedBySlug(slug: string): Promise<DiscoveryF
   return apiClient<DiscoveryFeed>(`/storefront/discovery/${slug}/`);
 }
 
-export async function fetchStorefrontPromotions(): Promise<Promotion[]> {
+export async function fetchStorefrontPromotions(type?: string): Promise<Promotion[]> {
   try {
-    const data = await apiClient<any>("/storefront/promotions/");
+    const url = type ? `/storefront/promotions/?type=${type}` : "/storefront/promotions/";
+    const data = await apiClient<any>(url);
     return Array.isArray(data) ? data : data?.results || [];
   } catch (err: any) {
     console.warn(`[CMS] Storefront promotions fetch failed (${err.status || 'unknown'}): ${err.message}. Falling back to empty list.`);
@@ -90,8 +91,9 @@ export async function deleteDiscoveryFeedItem(itemId: string, token?: string): P
 }
 
 // Promotional Campaigns
-export async function fetchBackofficePromotions(token?: string): Promise<Promotion[]> {
-  const data = await apiClient<any>("/backoffice/cms/promotions/", { token });
+export async function fetchBackofficePromotions(token?: string, type?: string): Promise<Promotion[]> {
+  const url = type ? `/backoffice/cms/promotions/?type=${type}` : "/backoffice/cms/promotions/";
+  const data = await apiClient<any>(url, { token });
   return Array.isArray(data) ? data : data?.results || [];
 }
 

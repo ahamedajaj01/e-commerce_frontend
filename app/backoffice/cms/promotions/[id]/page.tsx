@@ -10,6 +10,8 @@ import {
 import { fetchBackofficeProducts } from "@/lib/api/catalog";
 import type { Promotion } from "@/types/cms";
 import type { Product } from "@/types/product";
+import { useModal } from "@/providers/ModalProvider";
+import { Button } from "@/components/ui/Button";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import Link from "next/link";
 import {
@@ -23,6 +25,7 @@ export default function PromotionDetailPage() {
     const { id } = useParams();
     const router = useRouter();
     const { token, isAuthenticated } = useAuth();
+    const { confirm } = useModal();
 
     const [promotion, setPromotion] = useState<Promotion | null>(null);
     const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -98,22 +101,29 @@ export default function PromotionDetailPage() {
         }
     };
 
-    const handleRemoveProduct = async (productId: string) => {
+    const handleRemoveProduct = (productId: string) => {
         if (!token || !promotion) return;
-        if (!confirm("Remove this product from the campaign?")) return;
 
-        setIsSaving(true);
-        try {
-            const currentIds = promotion.products?.map((p: any) => p.id) || [];
-            const newIds = currentIds.filter(id => id !== productId);
-            await updatePromotion(promotion.id, { product_ids: newIds }, token);
-            setSuccess("Product removed.");
-            load();
-        } catch {
-            setError("Could not remove product.");
-        } finally {
-            setIsSaving(false);
-        }
+        confirm({
+            title: "Remove Product?",
+            description: "Are you sure you want to remove this product from the campaign collection? This will immediately hide it from the campaign landing page.",
+            confirmText: "Remove",
+            variant: "danger",
+            onConfirm: async () => {
+                setIsSaving(true);
+                try {
+                    const currentIds = promotion.products?.map((p: any) => p.id) || [];
+                    const newIds = currentIds.filter(id => id !== productId);
+                    await updatePromotion(promotion.id, { product_ids: newIds }, token);
+                    setSuccess("Product removed.");
+                    load();
+                } catch {
+                    setError("Could not remove product.");
+                } finally {
+                    setIsSaving(false);
+                }
+            }
+        });
     };
 
     const filteredSuggestions = allProducts.filter(p =>

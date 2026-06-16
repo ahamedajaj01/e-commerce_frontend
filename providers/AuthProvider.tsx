@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useEffect, useMemo, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { login as loginApi, fetchProfile } from "@/lib/api/auth";
 import type { AuthCredentials, AuthContextValue, UserProfile } from "@/types/auth";
 
@@ -21,6 +22,7 @@ const initialAuthState: AuthContextValue = {
 export const AuthContext = createContext<AuthContextValue>(initialAuthState);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -53,7 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profile = await fetchProfile(token);
         updateSession(token, profile);
       } catch (err: any) {
-        if (err.status === 401) {
+        // If profile fetch fails with 401/403/404, the session is likely invalid
+        if ([401, 403, 404].includes(err.status)) {
+          console.warn("[Auth] Session invalid, logging out:", err.status);
           logout();
         }
       } finally {
@@ -65,10 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token]);
 
   useEffect(() => {
-    const handleUnauthorized = () => logout();
-    window.addEventListener("auth-unauthorized", handleUnauthorized);
-    return () => window.removeEventListener("auth-unauthorized", handleUnauthorized);
-  }, []);
+    const handleUnauthorized = (e: any) => {
+      logout();
+      const hint = e.detail?.loginHint;
+      if (hint) {
+        console.log("[Auth] Redirecting using hint:", hint);
+        router.push(hint);
+      }
+    };
+    window.addEventListener("auth-unauthorized", handleUnauthorized as any);
+    return () => window.removeEventListener("auth-unauthorized", handleUnauthorized as any);
+  }, [router]);
 
   const updateSession = (sessionToken: string, profile: UserProfile) => {
     // Normalize roles (handle both plural and singular from backend)

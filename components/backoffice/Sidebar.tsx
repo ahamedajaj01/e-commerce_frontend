@@ -5,14 +5,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  LayoutDashboard,
+  Package,
+  Boxes,
+  Truck,
+  Tag,
+  Shield,
+  Megaphone,
+  Search,
+  Map,
+  Settings,
+  LogOut,
+  Store,
+  ShoppingBag,
+  Users,
+  Bell,
+  Terminal,
+  Image as ImageIcon,
+} from "lucide-react";
 
 import { fetchBackofficeNavigationItems } from "@/lib/api/cms";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: string;
+  icon: React.ElementType;
   children?: { label: string; href: string }[];
 }
 
@@ -25,15 +45,15 @@ const NAVIGATION_BASE: NavGroup[] = [
   {
     title: "Operations",
     items: [
-      { label: "Overview", href: "/backoffice/dashboard", icon: "📊" },
-      { label: "Orders", href: "/backoffice/orders", icon: "📦" },
-      { label: "Inventory", href: "/backoffice/inventory", icon: "🏬" },
+      { label: "Overview", href: "/backoffice/dashboard", icon: LayoutDashboard },
+      { label: "Orders", href: "/backoffice/orders", icon: ShoppingBag },
+      { label: "Inventory", href: "/backoffice/inventory", icon: Boxes },
     ],
   },
   {
     title: "Fulfillment",
     items: [
-      { label: "Shipping & Delivery", href: "/backoffice/shipping", icon: "🚚" },
+      { label: "Shipping Rules", href: "/backoffice/shipping", icon: Truck },
     ],
   },
   {
@@ -42,28 +62,32 @@ const NAVIGATION_BASE: NavGroup[] = [
       {
         label: "Catalog",
         href: "#",
-        icon: "👕",
+        icon: Package,
         children: [
           { label: "All Products", href: "/backoffice/catalog" },
         ]
       },
-      { label: "Categories", href: "/backoffice/categories", icon: "🏷️" },
-      { label: "Brands", href: "/backoffice/brands", icon: "🛡️" },
-      { label: "Campaign Merchandising", href: "/backoffice/cms/promotions", icon: "🛍️" },
-      { label: "Announcement Center", href: "/backoffice/cms/announcements", icon: "📢" },
-      { label: "Visual Banners", href: "/backoffice/marketing", icon: "🖼️" },
+      { label: "Categories", href: "/backoffice/categories", icon: Tag },
+      { label: "Brands", href: "/backoffice/brands", icon: Shield },
+      { label: "Campaign Studio", href: "/backoffice/cms/promotions", icon: Megaphone },
+      { label: "Announcements", href: "/backoffice/cms/announcements", icon: Megaphone },
+      { label: "Visual Banners", href: "/backoffice/marketing", icon: ImageIcon },
     ],
   },
   {
     title: "Storefront",
     items: [
-      { label: "Navigation Menus", href: "/backoffice/cms/navigation", icon: "🧭" },
+      { label: "Navigation Menus", href: "/backoffice/cms/navigation", icon: Map },
     ],
   },
   {
     title: "System",
     items: [
-      { label: "Settings", href: "/backoffice/settings", icon: "⚙️" },
+      { label: "General", href: "/backoffice/settings", icon: Settings },
+      { label: "Users", href: "/backoffice/settings/users", icon: Users },
+      { label: "Roles & Permissions", href: "/backoffice/settings/roles", icon: Shield },
+      { label: "Notifications", href: "/backoffice/settings/notifications", icon: Bell },
+      { label: "Activity Logs", href: "/backoffice/settings/logs", icon: Terminal },
     ],
   },
 ];
@@ -72,13 +96,10 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout, token } = useAuth();
 
-  // Track expanded sub-menus (like Catalog)
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
-  // Track expanded high-level sections (like Operations, Commercial)
   const [expandedSections, setExpandedSections] = useState<string[]>(NAVIGATION_BASE.map(s => s.title));
   const [dynamicNavigation, setDynamicNavigation] = useState<NavGroup[]>(NAVIGATION_BASE);
 
-  // Auto-expand the correct section and menu based on URL
   useEffect(() => {
     const activeSection = dynamicNavigation.find(s =>
       s.items.some(item =>
@@ -91,25 +112,20 @@ export function Sidebar() {
       if (!expandedSections.includes(activeSection.title)) {
         setExpandedSections(prev => [...prev, activeSection.title]);
       }
-
       const activeItemWithChildren = activeSection.items.find(i =>
         i.children?.some(child => pathname.startsWith(child.href))
       );
-
       if (activeItemWithChildren && !expandedMenus.includes(activeItemWithChildren.label)) {
         setExpandedMenus(prev => [...prev, activeItemWithChildren.label]);
       }
     }
   }, [pathname, dynamicNavigation]);
 
-  // Fetch navigation to dynamically show/hide Catalog sub-sections
   useEffect(() => {
     async function syncSidebar() {
       if (!token) return;
       try {
         const navItems = await fetchBackofficeNavigationItems(token);
-
-        // Flatten the nav tree to get all possible links
         const allLinks: { label: string; href: string }[] = [];
         const flatten = (items: any[]) => {
           items.forEach(item => {
@@ -128,27 +144,23 @@ export function Sidebar() {
           "exclusive": { label: "Exclusive Collection", href: "/backoffice/catalog/sections/exclusive-collection" },
         };
 
-        // Track seen links to avoid duplicates
         const seenKeys = new Set<string>();
         const dynamicChildren: { label: string; href: string }[] = [
           { label: "All Products", href: "/backoffice/catalog" }
         ];
         seenKeys.add("/backoffice/catalog");
 
-        // 1. Process /collections/ links from Navbar
         allLinks.forEach(link => {
           const collectionMatch = link.href.match(/\/collections\/([^/]+)/);
           if (collectionMatch) {
             const slug = collectionMatch[1];
             const systemEntry = systemMapping[slug];
-
             if (systemEntry) {
               if (!seenKeys.has(systemEntry.href)) {
                 dynamicChildren.push(systemEntry);
                 seenKeys.add(systemEntry.href);
               }
             } else {
-              // Custom Collection link in Nav
               const customHref = `/backoffice/catalog/sections/${slug}`;
               if (!seenKeys.has(customHref)) {
                 dynamicChildren.push({ label: link.label, href: customHref });
@@ -158,7 +170,6 @@ export function Sidebar() {
           }
         });
 
-        // 2. Ensure "Homepage Selection" and "Exclusive Collection" are ALWAYS there even if not in Nav
         const essentials = ["homepage", "exclusive"];
         essentials.forEach(key => {
           const entry = systemMapping[key];
@@ -183,7 +194,6 @@ export function Sidebar() {
         console.warn("[Sidebar] Dynamic sync failed:", e);
       }
     }
-
     syncSidebar();
   }, [token]);
 
@@ -193,134 +203,114 @@ export function Sidebar() {
     );
   };
 
-  const toggleMenu = (label: string, e: React.MouseEvent) => {
-    const isExpanded = expandedMenus.includes(label);
-    if (isExpanded) {
-      setExpandedMenus(prev => prev.filter(m => m !== label));
-    } else {
-      setExpandedMenus(prev => [...prev, label]);
-    }
+  const toggleMenu = (label: string) => {
+    setExpandedMenus(prev =>
+      prev.includes(label) ? prev.filter(m => m !== label) : [...prev, label]
+    );
   };
 
   return (
-    <aside className="w-64 border-r border-slate-200 bg-white h-full flex flex-col fixed left-0 top-0 z-50 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-      <div className="p-6 h-16 flex items-center border-b border-slate-100">
-        <Link href="/backoffice/dashboard" className="flex items-center gap-3">
-          <div className="h-7 w-7 rounded-lg bg-slate-950 flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-slate-200">AI</div>
-          <span className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-900">Lyra Label</span>
+    <aside className="w-64 border-r border-slate-200 bg-white h-full flex flex-col fixed left-0 top-0 z-50 shadow-sm">
+      <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0">
+        <Link href="/backoffice/dashboard" className="flex items-center">
+          <span className="text-lg font-black text-slate-900 tracking-tighter uppercase">Lyra Label</span>
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
         {dynamicNavigation.map((section) => {
           const isSectionExpanded = expandedSections.includes(section.title);
-
           return (
-            <div key={section.title} className="space-y-1">
+            <div key={section.title} className="space-y-1.5">
               <button
                 onClick={() => toggleSection(section.title)}
-                className="w-full flex items-center justify-between px-3 py-2 group cursor-pointer"
+                className="w-full flex items-center justify-between px-2 py-1 group"
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-900 transition-colors">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
                   {section.title}
-                </p>
-                <ChevronRight className={cn(
-                  "w-3 h-3 text-slate-300 transition-transform duration-300",
-                  isSectionExpanded ? "rotate-90 text-slate-950" : ""
+                </span>
+                <ChevronDown className={cn(
+                  "w-3 h-3 text-slate-300 transition-transform duration-200",
+                  !isSectionExpanded && "-rotate-90"
                 )} />
               </button>
 
-              <div className={cn(
-                "space-y-0.5 overflow-hidden transition-all duration-300",
-                isSectionExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-              )}>
-                {section.items.map((item) => {
-                  const isPathActive = pathname === item.href || (item.href !== "/backoffice" && pathname.startsWith(item.href + "/"));
-                  const hasChildren = item.children && item.children.length > 0;
-                  const isChildActive = hasChildren && item.children?.some(child => pathname === child.href);
-                  const isMenuExpanded = expandedMenus.includes(item.label);
+              {isSectionExpanded && (
+                <div className="space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isPathActive = pathname === item.href || (item.href !== "/backoffice" && pathname.startsWith(item.href + "/"));
+                    const hasChildren = item.children && item.children.length > 0;
+                    const isChildActive = hasChildren && item.children?.some(child => pathname === child.href);
+                    const isMenuExpanded = expandedMenus.includes(item.label);
 
-                  return (
-                    <div key={item.label} className="space-y-0.5">
-                      <Link
-                        href={item.href}
-                        onClick={(e) => {
-                          if (hasChildren || item.href === "#") {
-                            e.preventDefault();
-                            if (hasChildren) toggleMenu(item.label, e);
-                          }
-                        }}
-                        className={cn(
-                          "flex items-center justify-between px-3 py-2 rounded-lg text-[12px] font-semibold transition-all duration-150 group",
-                          (isPathActive || isChildActive)
-                            ? "bg-slate-50 text-slate-900 border border-slate-200 shadow-sm"
-                            : "text-slate-500 hover:bg-slate-50/80 hover:text-slate-900"
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-[13px] opacity-90 transition-transform group-hover:scale-110">{item.icon}</span>
-                          <span className="tracking-tight">{item.label}</span>
-                        </div>
-                        {hasChildren && (
-                          <span className={cn(
-                            "text-[10px] transition-transform duration-300 opacity-30",
-                            isMenuExpanded ? "rotate-90" : ""
-                          )}>▶</span>
-                        )}
-                      </Link>
+                    return (
+                      <div key={item.label} className="space-y-0.5">
+                        <Link
+                          href={item.href}
+                          onClick={(e) => {
+                            if (hasChildren || item.href === "#") {
+                              e.preventDefault();
+                              toggleMenu(item.label);
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center justify-between px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors group",
+                            (isPathActive || isChildActive)
+                              ? "bg-slate-900 text-white shadow-sm"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className={cn("w-4 h-4", (isPathActive || isChildActive) ? "text-white" : "text-slate-400 group-hover:text-slate-900")} />
+                            <span>{item.label}</span>
+                          </div>
+                          {hasChildren && (
+                            <ChevronDown className={cn(
+                              "w-3 h-3 transition-transform duration-200 opacity-60",
+                              !isMenuExpanded && "-rotate-90"
+                            )} />
+                          )}
+                        </Link>
 
-                      {hasChildren && isMenuExpanded && (
-                        <div className="ml-5 mt-1 border-l border-slate-100 pl-4 space-y-0.5 pt-0.5 pb-2 animate-in slide-in-from-left-2 duration-300">
-                          {item.children?.map((child) => {
-                            const isSubActive = pathname === child.href;
-                            return (
-                              <Link
-                                key={child.label}
-                                href={child.href}
-                                className={cn(
-                                  "relative block px-3 py-2 rounded-md text-[11px] font-medium transition-all group/sub",
-                                  isSubActive
-                                    ? "text-fuchsia-600 bg-fuchsia-50/40"
-                                    : "text-slate-400 hover:text-slate-700 hover:bg-slate-50/50"
-                                )}
-                              >
-                                {isSubActive && (
-                                  <span className="absolute -left-[17px] top-1/2 -translate-y-1/2 w-1 h-3 bg-fuchsia-500 rounded-r-full" />
-                                )}
-                                <span className="relative z-10 transition-transform group-hover/sub:translate-x-1 inline-block">{child.label}</span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        {hasChildren && isMenuExpanded && (
+                          <div className="ml-4 mt-0.5 border-l border-slate-100 pl-3 space-y-0.5 animate-in slide-in-from-left-2 duration-200">
+                            {item.children?.map((child) => {
+                              const isSubActive = pathname === child.href;
+                              return (
+                                <Link
+                                  key={child.label}
+                                  href={child.href}
+                                  className={cn(
+                                    "block px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                                    isSubActive
+                                      ? "text-slate-900 bg-slate-50 font-semibold"
+                                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                  )}
+                                >
+                                  {child.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-100 space-y-3">
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-fuchsia-100 flex items-center justify-center text-[10px] font-bold text-fuchsia-700">
-            {user?.name?.charAt(0) || "S"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black text-slate-900 truncate">
-              {user?.name || user?.email?.split('@')[0] || "Staff Member"}
-            </p>
-            <p className="text-[9px] text-slate-400 font-bold truncate uppercase tracking-widest">
-              {user?.roles?.[0] || user?.role || "Verified"}
-            </p>
-          </div>
-        </div>
+      <div className="p-4 border-t border-slate-100 space-y-3 shrink-0">
         <button
           onClick={logout}
-          className="w-full py-2.5 px-3 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all border border-transparent hover:border-rose-100"
+          className="w-full inline-flex items-center gap-2 px-2.5 py-2 rounded-md text-xs font-semibold text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
         >
-          Terminate Session
+          <LogOut className="w-3.5 h-3.5" />
+          Sign Out
         </button>
       </div>
     </aside>

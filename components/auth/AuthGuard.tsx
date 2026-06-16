@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -29,36 +30,44 @@ export default function AuthGuard({
     }
 
     if (!isAuthenticated) {
+      console.log("[AuthGuard] Not authenticated, redirecting to:", redirectTo);
       router.replace(redirectTo);
       return;
     }
 
-    if (allowedRoles && user && !(user.roles || []).some((role) => allowedRoles.includes(role))) {
-      router.replace("/unauthorized");
-    }
-  }, [isAuthenticated, isLoading, user, router, allowedRoles, redirectTo]);
+    if (allowedRoles && user) {
+      const userRoles = user.roles || [];
+      const hasRequiredRole = userRoles.some((role) => allowedRoles.includes(role));
 
-  // Show loading screen only on initial load or if we are definitely not authenticated yet
-  if (isLoading) {
+      if (!hasRequiredRole) {
+        console.warn("[AuthGuard] Unauthorized access attempted by:", user.email);
+        router.replace("/unauthorized");
+      }
+    }
+  }, [isAuthenticated, isLoading, user, router, allowedRoles, redirectTo, hasMounted]);
+
+  // While checking auth status
+  if (isLoading || !hasMounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-100">
-        <div className="rounded-3xl border border-slate-700/70 bg-slate-900/95 px-10 py-8 text-center shadow-xl shadow-slate-950/40">
-          <div className="mx-auto mb-4 h-6 w-6 animate-spin rounded-full border-2 border-fuchsia-500 border-t-transparent" />
-          <p className="text-sm font-black uppercase tracking-[0.2em]">Authenticating...</p>
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">Checking Authentication</p>
         </div>
       </div>
     );
   }
 
-  // If we're not authenticated and not loading, we should be redirecting
-  // We'll return null to avoid flashing content while the redirect happens
+  // If we're not authenticated, we're in the process of redirecting
   if (!isAuthenticated) {
     return null;
   }
 
-  // Role check
-  if (allowedRoles && user && !(user.roles || []).some((role) => allowedRoles.includes(role))) {
-    return null; // The useEffect will handle the redirect to /unauthorized
+  // Role check - redundant but safe for the return path
+  if (allowedRoles && user) {
+    const userRoles = user.roles || [];
+    const hasRequiredRole = userRoles.some((role) => allowedRoles.includes(role));
+    if (!hasRequiredRole) return null;
   }
 
   return <>{children}</>;

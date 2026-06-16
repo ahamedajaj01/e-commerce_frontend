@@ -1,459 +1,437 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
     fetchBackofficePromotions,
     createPromotion,
     updatePromotion,
     deletePromotion,
-    fetchBackofficeCollections
 } from "@/lib/api/cms";
-import { fetchBackofficeProducts, fetchBackofficeProductIds, fetchBackofficeCategories, fetchBackofficeBrands } from "@/lib/api/catalog";
+import {
+    fetchBackofficeProducts,
+    fetchBackofficeProductIds,
+    fetchBackofficeCategories,
+    fetchBackofficeBrands
+} from "@/lib/api/catalog";
 import type { Promotion } from "@/types/cms";
-import type { Product, Category, Brand } from "@/types/product";
+import type { Category, Brand, Product } from "@/types/product";
+import { useModal } from "@/providers/ModalProvider";
+import { Button } from "@/components/ui/Button";
 import { AlertBanner } from "@/components/ui/AlertBanner";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Search, X, ShoppingBag, LayoutGrid, Check, Edit, ExternalLink, Filter, ChevronRight, ChevronLeft, Package, Tag, Layers, RefreshCw } from "lucide-react";
+import {
+    Plus,
+    Search,
+    X,
+    Trash2,
+    Calendar,
+    ArrowRight,
+    ShoppingBag,
+    CheckCircle2,
+    Settings2,
+    Loader2,
+    ChevronLeft,
+    ChevronRight,
+    Pencil,
+    Filter,
+} from "lucide-react";
 import { getProductImage } from "@/lib/utils";
+
+const INPUT =
+    "w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition placeholder:text-slate-300";
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+    return (
+        <div className="space-y-1">
+            <label className="block text-xs font-medium text-slate-600">
+                {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+            </label>
+            {children}
+        </div>
+    );
+}
 
 export default function PromotionsPage() {
     const { token, isAuthenticated } = useAuth();
+    const { confirm } = useModal();
     const [promotions, setPromotions] = useState<Promotion[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    // Form Management
-    const [showStudio, setShowStudio] = useState(false);
+    // Management Console State
+    const [showConsole, setShowConsole] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+
+    // Form State
     const [title, setTitle] = useState("");
+    const [slug, setSlug] = useState("");
     const [description, setDescription] = useState("");
-    const [targetCategoryId, setTargetCategoryId] = useState("");
-    const [targetBrandId, setTargetBrandId] = useState("");
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [isPublic, setIsPublic] = useState(true);
+
+    // Automation Rules
+    const [selCategory, setSelCategory] = useState("");
+    const [selBrand, setSelBrand] = useState("");
+
+    // Merchandising Selection
+    const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [catalogSearch, setCatalogSearch] = useState("");
+    const [stockStatus, setStockStatus] = useState("all");
+    const [catalogPage, setCatalogPage] = useState(1);
+    const [isSearching, setIsSearching] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Metadata
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<Brand[]>([]);
-    const [collections, setCollections] = useState<any[]>([]);
 
-    // Product Picker State
-    const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
-    const [totalProducts, setTotalProducts] = useState(0);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [isProductLoading, setIsProductLoading] = useState(false);
-    const [search, setSearch] = useState("");
-    const [selCategory, setSelCategory] = useState("");
-    const [selBrand, setSelBrand] = useState("");
-    const [stockStatus, setStockStatus] = useState("");
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Bootstrap Metadata
-    useEffect(() => {
+    const loadPromotions = async () => {
         if (!token) return;
-        const init = async () => {
-            try {
-                const [promos, cats, brs, cols] = await Promise.all([
-                    fetchBackofficePromotions(token),
-                    fetchBackofficeCategories(token),
-                    fetchBackofficeBrands(token),
-                    fetchBackofficeCollections(token)
-                ]);
-                const systemTitles = ["New Arrivals", "Trending Now", "Best Sellers", "Homepage Selection"];
-                setPromotions(promos.filter(p =>
-                    !p.cta_link &&
-                    !systemTitles.some(t => p.title.toLowerCase() === t.toLowerCase()) &&
-                    p.description !== "Storefront Exclusive Collection"
-                ));
-                setCategories(cats);
-                setBrands(brs);
-                setCollections(cols);
-            } catch (e) { setError("Studio initialization failed."); }
-            finally { setIsLoading(false); }
-        };
-        init();
-    }, [token]);
-
-    // Async Product Linker (Fetching products matching selection)
-    useEffect(() => {
-        if (!token || !showStudio) return;
-        const fetchItems = async () => {
-            setIsProductLoading(true);
-            try {
-                const data = await fetchBackofficeProducts(token, {
-                    page: currentPage,
-                    page_size: 10,
-                    search,
-                    category: selCategory,
-                    brand: selBrand,
-                    stock_status: stockStatus
-                });
-                setAvailableProducts(data.results);
-                setTotalProducts(data.count);
-            } catch (e) { console.error(e); }
-            finally { setIsProductLoading(false); }
-        };
-        fetchItems();
-    }, [token, showStudio, currentPage, search, selCategory, selBrand, stockStatus]);
-
-    const handleBulkSelect = async () => {
-        if (!token) return;
-        const ids = await fetchBackofficeProductIds(token, {
-            search,
-            category: selCategory,
-            brand: selBrand,
-            stock_status: stockStatus
-        });
-        setSelectedIds(prev => Array.from(new Set([...prev, ...ids])));
-        setSuccess(`Bulk Added ${ids.length} products to campaign.`);
+        setIsLoading(true);
+        try {
+            const data = await fetchBackofficePromotions(token, "CAMPAIGN");
+            const results = Array.isArray(data) ? data : (data as any).results || [];
+            const filtered = results.filter((p: any) => p.promotion_type === "CAMPAIGN");
+            setPromotions(filtered);
+        } catch {
+            setError("Failed to load campaigns.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!token || !title.trim()) return setError("Campaign title required");
-        setIsSaving(true);
+    const loadMetadata = async () => {
+        if (!token) return;
         try {
-            const fd = new FormData();
-            fd.append("title", title);
-            fd.append("description", description);
-            fd.append("is_visible", "true");
-            if (targetCategoryId) fd.append("category", targetCategoryId);
-            if (targetBrandId) fd.append("brand", targetBrandId);
-            if (imageFile) fd.append("image", imageFile);
+            const [catRes, brandRes] = await Promise.all([
+                fetchBackofficeCategories(token),
+                fetchBackofficeBrands(token)
+            ]);
+            setCategories(Array.isArray(catRes) ? catRes : (catRes as any).results || []);
+            setBrands(Array.isArray(brandRes) ? brandRes : (brandRes as any).results || []);
+        } catch { }
+    };
 
-            selectedIds.forEach(id => {
-                fd.append("product_ids", id);
-                fd.append("products", id);
+    const loadCatalog = async () => {
+        if (!token) return;
+        setIsSearching(true);
+        try {
+            const res = await fetchBackofficeProducts(token, {
+                search: catalogSearch,
+                category: selCategory,
+                brand: selBrand,
+                stock_status: stockStatus,
+                page: catalogPage,
+                page_size: 20
             });
+            setCatalogProducts(res.results || []);
+        } catch { } finally { setIsSearching(false); }
+    };
 
-            if (editingId) await updatePromotion(editingId, fd, token);
-            else await createPromotion(fd, token);
+    useEffect(() => {
+        if (isAuthenticated && token) {
+            loadPromotions();
+            loadMetadata();
+        }
+    }, [token, isAuthenticated]);
 
-            setSuccess("Campaign Synced Successfully");
-            setShowStudio(false);
-            window.location.reload(); // Refresh to catch all changes
-        } catch (err: any) { setError(err.message || "Save failed"); }
+    useEffect(() => {
+        if (showConsole) {
+            loadCatalog();
+        }
+    }, [showConsole, catalogSearch, selCategory, selBrand, stockStatus, catalogPage]);
+
+    const openConsole = (promo?: Promotion) => {
+        setCatalogPage(1);
+        if (promo) {
+            setEditingId(promo.id);
+            setTitle(promo.title);
+            setSlug((promo as any).slug || "");
+            setDescription(promo.description || "");
+            setStartDate((promo as any).start_date || "");
+            setEndDate((promo as any).end_date || "");
+            setIsPublic(promo.is_visible !== false);
+            setSelectedIds(promo.products?.map((p: any) => p.id) || []);
+            setSelCategory((promo as any).target_category || "");
+            setSelBrand((promo as any).target_brand || "");
+        } else {
+            setEditingId(null); setTitle(""); setSlug(""); setDescription("");
+            setStartDate(""); setEndDate(""); setIsPublic(true);
+            setSelectedIds([]); setSelCategory(""); setSelBrand("");
+        }
+        setShowConsole(true);
+    };
+
+    const handleSave = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!token) return;
+
+        setIsSaving(true);
+        const payload = {
+            title, slug, description,
+            start_date: startDate || null,
+            end_date: endDate || null,
+            is_visible: isPublic,
+            product_ids: selectedIds,
+            target_category: selCategory || null,
+            target_brand: selBrand || null
+        };
+
+        try {
+            if (editingId) {
+                await updatePromotion(editingId, payload, token);
+            } else {
+                await createPromotion(payload, token);
+            }
+            setShowConsole(false);
+            setSuccess("Campaign configuration saved.");
+            setTimeout(() => setSuccess(null), 3000);
+            loadPromotions();
+        } catch { setError("Failed to save campaign."); }
         finally { setIsSaving(false); }
     };
 
-    const handleEdit = (p: Promotion) => {
-        setEditingId(p.id);
-        setTitle(p.title);
-        setDescription(p.description || "");
-        setTargetCategoryId(typeof p.category === 'object' ? (p.category as any)?.id : p.category || "");
-        setTargetBrandId((p as any).brand || "");
-        setSelectedIds(p.products?.map((prod: any) => prod.id) || []);
-        setImagePreview(p.image || null);
-        setShowStudio(true);
+    const toggleProduct = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
     };
-
-    const resetStudio = () => {
-        setEditingId(null); setTitle(""); setDescription(""); setTargetCategoryId(""); setTargetBrandId("");
-        setSelectedIds([]); setImageFile(null); setImagePreview(null); setShowStudio(true);
-    };
-
-    if (isLoading) return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-            <RefreshCw className="w-10 h-10 text-indigo-500 animate-spin" />
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Loading Studio...</p>
-        </div>
-    );
 
     return (
-        <div className="max-w-7xl mx-auto pb-20 px-4">
-            {error && <AlertBanner message={error} type="error" onClose={() => setError(null)} />}
+        <div className="max-w-[1100px] mx-auto py-8 px-6 space-y-6">
+            <AlertBanner message={error || ""} type="error" onClose={() => setError(null)} />
             {success && <AlertBanner message={success} type="success" onClose={() => setSuccess(null)} />}
 
-            {/* Premium Header */}
-            <header className="flex items-center justify-between mb-10 bg-white/60 backdrop-blur-xl border border-white/40 p-8 rounded-[2.5rem] shadow-xl shadow-slate-100/50 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-100/30">
-                <div className="flex items-center gap-6">
-                    <div className="p-4 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-3xl shadow-lg shadow-indigo-200 ring-4 ring-white">
-                        <ShoppingBag className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Campaign Merchandising</h1>
-                        <div className="text-sm font-bold text-slate-400 mt-1 flex items-center gap-2">
-                            Professional Studio <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" /> V3.2
-                        </div>
-                    </div>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-[18px] font-semibold text-slate-900 tracking-tight">Campaign Studio</h1>
+                    <p className="text-sm text-slate-500 mt-0.5">Manage sale events, curated collections, and discount groups.</p>
                 </div>
-                <button
-                    onClick={resetStudio}
-                    className="group relative px-8 py-4 bg-slate-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl overflow-hidden shadow-slate-400 hover:scale-[1.02] active:scale-95 transition-all duration-300"
-                >
-                    <div className="relative z-10 flex items-center gap-3">
-                        <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" /> New Campaign
+                {!showConsole && (
+                    <Button
+                        onClick={() => openConsole()}
+                        className="gap-1.5"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        Create Campaign
+                    </Button>
+                )}
+            </div>
+
+            {/* Dashboard Table */}
+            {!showConsole && (
+                <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Campaigns</h2>
+                        <span className="text-xs text-slate-400">{promotions.length} Total</span>
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-            </header>
-
-            {/* Empty State */}
-            {promotions.length === 0 && !showStudio && (
-                <div className="bg-white rounded-[3rem] border-4 border-dashed border-slate-100 p-32 text-center transition-colors hover:border-indigo-100">
-                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-                        <Tag className="w-10 h-10 text-slate-200" />
-                    </div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">No Active Campaigns</h3>
-                    <p className="text-slate-400 text-sm font-bold mt-3 max-w-sm mx-auto">Create time-limited collections or category-wide sales using the Campaign Studio.</p>
-                </div>
-            )}
-
-            {/* Campaign Grid */}
-            {!showStudio && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-6 duration-500">
-                    {promotions.map(promo => (
-                        <div key={promo.id} className="group bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500">
-                            <div className="aspect-[16/9] bg-slate-100 relative group-hover:scale-105 transition-transform duration-700">
-                                {promo.image ? (
-                                    <img src={promo.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-slate-300">
-                                        <Layers className="w-12 h-12" />
-                                    </div>
-                                )}
-                                <div className="absolute top-6 left-6 flex gap-2">
-                                    <div className="px-5 py-2 bg-white/90 backdrop-blur rounded-full shadow-lg border border-white">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-900">
-                                            {promo.products?.length || 0} Items
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="p-8">
-                                <h3 className="text-lg font-black text-slate-900 tracking-tight mb-2 uppercase">{promo.title}</h3>
-                                <p className="text-sm text-slate-400 font-bold line-clamp-2 min-h-[2.5rem]">{promo.description || "Active Storefront Campaign"}</p>
-                                <div className="mt-8 flex items-center justify-between gap-4">
-                                    <button
-                                        onClick={() => handleEdit(promo)}
-                                        className="h-12 w-12 flex items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => { if (confirm("Terminate Campaign?")) deletePromotion(promo.id, token!).then(() => window.location.reload()) }}
-                                        className="h-12 w-12 flex items-center justify-center rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                    <Link
-                                        href={`/collections/${promo.id}`}
-                                        className="flex-1 h-12 flex items-center justify-center gap-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] hover:bg-slate-800 transition-all group"
-                                    >
-                                        View Live <ExternalLink className="w-3 h-3 transition-transform group-hover:translate-x-1" />
-                                    </Link>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* SALE CAMPAIGN STUDIO OVERLAY */}
-            {showStudio && (
-                <div className="fixed inset-0 z-50 overflow-hidden bg-slate-50/95 backdrop-blur-xl animate-in fade-in duration-300">
-                    <div className="flex h-full">
-                        {/* Sidebar: Campaign Settings */}
-                        <div className="w-[450px] bg-white border-r border-slate-200 h-full flex flex-col p-12 shadow-2xl animate-in slide-in-from-left duration-500">
-                            <div className="flex items-center gap-4 mb-12">
-                                <button onClick={() => setShowStudio(false)} className="p-3 rounded-2xl hover:bg-slate-100 transition active:scale-95">
-                                    <X className="w-5 h-5 text-slate-500" />
-                                </button>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Campaign Studio</h2>
-                            </div>
-
-                            <form className="flex-1 overflow-y-auto pr-4 no-scrollbar space-y-10" id="campaign-form">
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Campaign Title</label>
-                                    <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Summer Collection 24" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm font-black focus:ring-4 focus:ring-indigo-50 transition-all outline-none" />
-                                </div>
-
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Hero Graphics</label>
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="aspect-[21/9] bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl overflow-hidden cursor-pointer flex flex-col items-center justify-center gap-4 group hover:border-indigo-300 transition-all"
-                                    >
-                                        {imagePreview ? (
-                                            <img src={imagePreview} className="w-full h-full object-cover group-hover:opacity-80 transition-opacity" />
-                                        ) : (
-                                            <>
-                                                <div className="p-3 bg-white rounded-xl shadow-sm"><Plus className="w-5 h-5 text-slate-400" /></div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Upload Banner</p>
-                                            </>
-                                        )}
-                                        <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={e => {
-                                            const f = e.target.files?.[0];
-                                            if (f) { setImageFile(f); setImagePreview(URL.createObjectURL(f)); }
-                                        }} />
-                                    </div>
-                                </div>
-
-                                <div className="pt-6 border-t border-slate-100 space-y-8">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-500">Targeting Strategy</h3>
-
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                            <Tag className="w-3 h-3" /> Auto-Target Category
-                                        </label>
-                                        <select value={targetCategoryId} onChange={e => setTargetCategoryId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm font-black focus:ring-4 focus:ring-indigo-50 transition-all outline-none">
-                                            <option value="">Manual Selection Only</option>
-                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1 flex items-center gap-2">
-                                            <Package className="w-3 h-3" /> Auto-Target Brand
-                                        </label>
-                                        <select value={targetBrandId} onChange={e => setTargetBrandId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm font-black focus:ring-4 focus:ring-indigo-50 transition-all outline-none">
-                                            <option value="">Manual Selection Only</option>
-                                            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            </form>
-
-                            <div className="pt-10 border-t border-slate-100 mt-auto flex gap-4">
-                                <button disabled={isSaving} onClick={handleSave} className="flex-1 py-5 bg-slate-950 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all">
-                                    {isSaving ? "Syncing..." : (editingId ? "Update Campaign" : "Launch Campaign")}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Main Studio: High-Scale Product Picker */}
-                        <main className="flex-1 overflow-hidden flex flex-col p-12 space-y-10 animate-in slide-in-from-right duration-700">
-                            <header className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Product Merchandising</h3>
-                                    <p className="text-sm font-bold text-slate-400 mt-1">Curate specific highlights for your campaign storefront</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="px-6 py-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center gap-4">
-                                        <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">{selectedIds.length} Selections Locked</span>
-                                    </div>
-                                    <button onClick={() => setSelectedIds([])} className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-all active:scale-95 shadow-sm">
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </header>
-
-                            {/* Selection Preview Deck */}
-                            {selectedIds.length > 0 && (
-                                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar animate-in fade-in zoom-in-95">
-                                    {selectedIds.slice(0, 15).map(id => {
-                                        const p = availableProducts.find(pr => pr.id === id);
-                                        return (
-                                            <div key={id} className="relative group shrink-0">
-                                                <div className="w-16 h-16 bg-white border-2 border-white rounded-2xl overflow-hidden shadow-lg ring-1 ring-slate-100">
-                                                    {p?.media?.[0]?.file_url && <img src={p.media[0].file_url} className="w-full h-full object-cover" crossOrigin="anonymous" />}
-                                                </div>
-                                                <button onClick={() => setSelectedIds(s => s.filter(i => i !== id))} className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg transform scale-0 group-hover:scale-100 transition-transform">
-                                                    <X className="w-3 h-3" />
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/20 border-b border-slate-100">
+                                {["Campaign Name", "Status", "Items", "Schedule", ""].map((h) => (
+                                    <th key={h} className="px-4 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap last:text-right">
+                                        {h}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {isLoading ? (
+                                Array(3).fill(0).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        {Array(5).fill(0).map((__, j) => (
+                                            <td key={j} className="px-4 py-4"><div className="h-4 bg-slate-100 rounded w-full" /></td>
+                                        ))}
+                                    </tr>
+                                ))
+                            ) : promotions.length === 0 ? (
+                                <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-400">No campaigns found.</td></tr>
+                            ) : (
+                                promotions.map((p) => (
+                                    <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-medium text-slate-900">{p.title}</span>
+                                                <span className="text-[11px] text-slate-400 font-mono">{(p as any).slug}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium ${p.is_visible ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                                                }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${p.is_visible ? "bg-emerald-500" : "bg-slate-400"}`} />
+                                                {p.is_visible ? "Live" : "Draft"}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="text-sm font-semibold text-slate-900">{p.products?.length || 0}</span>
+                                            <span className="text-[10px] text-slate-400 ml-1 uppercase">SKUs</span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                                <Calendar className="w-3 h-3" />
+                                                {(p as any).start_date ? new Date((p as any).start_date).toLocaleDateString() : 'Now'}
+                                                <ArrowRight className="w-2.5 h-2.5 mx-1" />
+                                                {(p as any).end_date ? new Date((p as any).end_date).toLocaleDateString() : 'Forever'}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => openConsole(p)} title="Edit / Merchandise" className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        confirm({
+                                                            title: "Delete Campaign?",
+                                                            description: `Are you sure you want to delete "${p.title}"? This will remove the campaign and its merchandising curations from the storefront.`,
+                                                            confirmText: "Delete",
+                                                            variant: "danger",
+                                                            onConfirm: async () => {
+                                                                await deletePromotion(p.id, token!);
+                                                                loadPromotions();
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </div>
-                                        );
-                                    })}
-                                    {selectedIds.length > 15 && (
-                                        <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center text-[10px] font-black text-white shadow-xl ring-4 ring-white">
-                                            +{selectedIds.length - 15}
-                                        </div>
-                                    )}
-                                </div>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
-                            {/* Heavy Filter Bar */}
-                            <div className="bg-white/50 border border-slate-200 rounded-[2rem] p-6 shadow-sm">
-                                <div className="grid grid-cols-12 gap-6 items-center">
-                                    <div className="col-span-4 relative group">
-                                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
-                                        <input
-                                            value={search}
-                                            onChange={e => setSearch(e.target.value)}
-                                            placeholder="Search Name, SKU, Brand..."
-                                            className="w-full bg-white border border-slate-100 rounded-2xl pl-14 pr-6 py-4 text-sm font-bold focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <select value={selCategory} onChange={e => setSelCategory(e.target.value)} className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-4 text-xs font-black uppercase tracking-widest outline-none">
-                                            <option value="">Category</option>
-                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <select value={selBrand} onChange={e => setSelBrand(e.target.value)} className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-4 text-xs font-black uppercase tracking-widest outline-none">
-                                            <option value="">Brand</option>
-                                            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <select value={stockStatus} onChange={e => setStockStatus(e.target.value)} className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-4 text-xs font-black uppercase tracking-widest outline-none">
-                                            <option value="">Stock Status</option>
-                                            <option value="in_stock">In Stock</option>
-                                            <option value="out_of_stock">Out of Stock</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleBulkSelect}
-                                            className="w-full h-full py-4 bg-indigo-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:bg-indigo-600 transition-all active:scale-95"
-                                        >
-                                            Bulk Add Results
-                                        </button>
-                                    </div>
+            {/* MERCHANDISING WORKBENCH (FULL SCREEN) */}
+            {showConsole && (
+                <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden animate-in fade-in duration-200">
+                    {/* Header */}
+                    <div className="h-16 border-b border-slate-200 px-6 flex items-center justify-between bg-white shrink-0">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setShowConsole(false)} className="p-2 -ml-2 rounded-md hover:bg-slate-100 transition text-slate-500">
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <div className="flex flex-col">
+                                <h2 className="text-sm font-semibold text-slate-900">{editingId ? `Merchandising: ${title}` : 'Build New Campaign'}</h2>
+                                <p className="text-[11px] text-slate-400">{selectedIds.length} items curated</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="secondary" onClick={() => setShowConsole(false)}>Cancel</Button>
+                            <Button
+                                onClick={() => handleSave()}
+                                loading={isSaving}
+                                className="min-w-[140px]"
+                            >
+                                Save Campaign
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex overflow-hidden">
+                        {/* LEFT: SETTINGS (240px) */}
+                        <aside className="w-[300px] border-r border-slate-200 bg-slate-50/30 p-6 overflow-y-auto space-y-8 shrink-0">
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Campaign Settings</p>
+                                <Field label="Campaign Title" required>
+                                    <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Summer Sale..." className={INPUT} />
+                                </Field>
+                                <Field label="Campaign Slug" required>
+                                    <input value={slug} onChange={e => setSlug(e.target.value)} placeholder="summer-sale" className={INPUT} />
+                                </Field>
+                            </div>
+
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Scheduling</p>
+                                <div className="grid grid-cols-1 gap-4">
+                                    <Field label="Start Date">
+                                        <input type="datetime-local" value={startDate} onChange={e => setStartDate(e.target.value)} className={INPUT} />
+                                    </Field>
+                                    <Field label="End Date">
+                                        <input type="datetime-local" value={endDate} onChange={e => setEndDate(e.target.value)} className={INPUT} />
+                                    </Field>
                                 </div>
                             </div>
 
-                            {/* Massive Product Grid */}
-                            <div className="flex-1 bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden flex flex-col shadow-sm">
-                                <div className="flex-1 overflow-y-auto no-scrollbar">
-                                    {isProductLoading ? (
-                                        <div className="h-full flex items-center justify-center"><RefreshCw className="w-10 h-10 animate-spin text-slate-100" /></div>
-                                    ) : (
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 p-8 gap-8">
-                                            {availableProducts.map(p => (
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200 pb-2">Automation Rules</p>
+                                <Field label="Category Filter">
+                                    <select value={selCategory} onChange={e => setSelCategory(e.target.value)} className={INPUT}>
+                                        <option value="">No filter</option>
+                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </Field>
+                                <Field label="Brand Filter">
+                                    <select value={selBrand} onChange={e => setSelBrand(e.target.value)} className={INPUT}>
+                                        <option value="">No filter</option>
+                                        {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                    </select>
+                                </Field>
+                            </div>
+                        </aside>
+
+                        {/* RIGHT: CATALOG SELECTION (split view) */}
+                        <main className="flex-1 flex flex-col bg-white overflow-hidden">
+                            <div className="h-14 border-b border-slate-100 flex items-center justify-between px-6 bg-slate-50/30">
+                                <div className="flex items-center gap-4 flex-1">
+                                    <div className="relative flex-1 max-w-sm">
+                                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                                        <input
+                                            value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)}
+                                            placeholder="Search products..."
+                                            className="w-full bg-white border border-slate-200 rounded-md pl-9 pr-4 py-1.5 text-xs font-medium outline-none focus:border-slate-400"
+                                        />
+                                    </div>
+                                    <select
+                                        value={stockStatus} onChange={e => setStockStatus(e.target.value)}
+                                        className="text-xs font-medium bg-white border border-slate-200 rounded-md py-1.5 px-3 outline-none"
+                                    >
+                                        <option value="all">All Inventory</option>
+                                        <option value="in_stock">In Stock</option>
+                                        <option value="out_of_stock">Out of Stock</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-1 pl-4">
+                                    <button disabled={catalogPage === 1} onClick={() => setCatalogPage(p => p - 1)} className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 disabled:opacity-20 transition"><ChevronLeft className="w-4 h-4" /></button>
+                                    <button onClick={() => setCatalogPage(p => p + 1)} className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 transition"><ChevronRight className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/10">
+                                {isSearching ? (
+                                    <div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin text-slate-300" /></div>
+                                ) : (
+                                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                                        {catalogProducts.map(p => {
+                                            const active = selectedIds.includes(p.id);
+                                            return (
                                                 <div
-                                                    key={p.id}
-                                                    onClick={() => setSelectedIds(prev => prev.includes(p.id) ? prev.filter(i => i !== p.id) : [...prev, p.id])}
-                                                    className={cn(
-                                                        "group relative bg-slate-50 rounded-3xl border-2 transition-all duration-300 cursor-pointer overflow-hidden aspect-[4/5]",
-                                                        selectedIds.includes(p.id) ? "border-indigo-500 ring-4 ring-indigo-50 bg-indigo-50/50 scale-[0.98]" : "border-transparent hover:border-slate-200 hover:bg-white hover:shadow-xl hover:-translate-y-1"
-                                                    )}
+                                                    key={p.id} onClick={() => toggleProduct(p.id)}
+                                                    className={`group relative bg-white border rounded-lg transition-all cursor-pointer overflow-hidden ${active ? 'border-slate-900 ring-2 ring-slate-900/5' : 'border-slate-200 hover:border-slate-300'}`}
                                                 >
-                                                    <img src={p.media?.[0]?.file_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" crossOrigin="anonymous" />
-                                                    {selectedIds.includes(p.id) && (
-                                                        <div className="absolute inset-0 bg-indigo-600/30 backdrop-blur-[2px] flex items-center justify-center animate-in zoom-in-75">
-                                                            <div className="h-10 w-10 bg-white rounded-full flex items-center justify-center shadow-xl"><Check className="w-5 h-5 text-indigo-600" /></div>
+                                                    <div className="aspect-[3/4] relative bg-slate-100 overflow-hidden">
+                                                        <img src={getProductImage(p)} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                                        <div className={`absolute top-2 right-2 h-5 w-5 rounded flex items-center justify-center transition-colors ${active ? 'bg-slate-900 text-white' : 'bg-white/80 border text-slate-300'}`}>
+                                                            {active ? <CheckCircle2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
                                                         </div>
-                                                    )}
-                                                    <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end translate-y-4 group-hover:translate-y-0 transition-transform">
-                                                        <p className="text-white text-[10px] font-black truncate uppercase tracking-widest">{p.name}</p>
-                                                        <p className="text-white/60 text-[9px] font-bold mt-1">₹{p.base_price}</p>
+                                                    </div>
+                                                    <div className="p-2.5">
+                                                        <p className="text-[11px] font-semibold text-slate-900 truncate">{p.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold mt-0.5">NPR {p.base_price}</p>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Studio Pagination */}
-                                <footer className="p-8 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        Showing {(currentPage - 1) * 10 + 1} to {Math.min(currentPage * 10, totalProducts)} of {totalProducts} Master Catalog items
+                                            );
+                                        })}
                                     </div>
-                                    <div className="flex gap-4">
-                                        <button disabled={currentPage <= 1} onClick={() => setCurrentPage(c => c - 1)} className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-all"><ChevronLeft /></button>
-                                        <button disabled={currentPage * 10 >= totalProducts} onClick={() => setCurrentPage(c => c + 1)} className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-all"><ChevronRight /></button>
-                                    </div>
-                                </footer>
+                                )}
                             </div>
                         </main>
                     </div>

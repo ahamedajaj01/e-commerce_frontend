@@ -12,7 +12,11 @@ export function AnnouncementBar() {
     useEffect(() => {
         fetchAnnouncements()
             .then(data => {
-                const visible = data.filter(a => a.is_visible).sort((a, b) => a.sort_order - b.sort_order);
+                // Only show announcements tagged as [TOP_BAR] or those with no tag (legacy)
+                const visible = data.filter(a =>
+                    a.is_visible &&
+                    (a.title.includes("[TOP_BAR]") || !a.title.includes("["))
+                ).sort((a, b) => a.sort_order - b.sort_order);
                 setAnnouncements(visible);
             })
             .catch(() => setAnnouncements([]));
@@ -47,7 +51,7 @@ export function AnnouncementBar() {
                     className="animate-in fade-in slide-in-from-top-1 duration-700 flex items-center justify-center gap-3 sm:gap-4 w-full"
                 >
                     <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-center">
-                        {current.title}
+                        {current.title.replace(/\[TOP_BAR\] /, "")}
                     </span>
                     {current.cta_text && (
                         <span className="hidden sm:inline-block bg-white text-slate-950 px-2.5 py-1 rounded-full text-[9px] font-black hover:bg-slate-100 transition-colors uppercase tracking-tight">

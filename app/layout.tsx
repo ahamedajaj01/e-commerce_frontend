@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { ModalProvider } from "@/providers/ModalProvider";
 import { CartProvider } from "@/providers/CartProvider";
 import Footer from "@/components/storefront/Footer";
 
@@ -19,9 +20,11 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body className="antialiased selection:bg-fuchsia-500/30">
         <AuthProvider>
-          <CartProvider>
-            {children}
-          </CartProvider>
+          <ModalProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </ModalProvider>
         </AuthProvider>
       </body>
     </html>

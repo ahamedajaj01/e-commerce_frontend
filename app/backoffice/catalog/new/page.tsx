@@ -3,24 +3,35 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/Button";
 import { AlertBanner } from "@/components/ui/AlertBanner";
 import { fetchBackofficeCategories, createProduct, fetchBackofficeBrands } from "@/lib/api/catalog";
-import { Copy, Trash2 } from "lucide-react";
+import {
+    Plus,
+    Trash2,
+    Copy,
+    Image as ImageIcon,
+    Camera,
+    ChevronLeft,
+    Check,
+    Layers,
+    Tag,
+    Workflow,
+    ArrowRight,
+    Zap,
+    Loader2
+} from "lucide-react";
 import type { Category, Brand } from "@/types/product";
 
-// ─── Predefined option lists ─────────────────────────────────────────────────
+// ─── Predefined options ──────────────────────────────────────────────────────
 const MATERIAL_OPTIONS = ["Georgette", "Cotton", "Silk", "Chiffon", "Linen", "Velvet", "Crepe", "Satin", "Organza", "Rayon", "Net", "Lycra"];
 const SLEEVE_OPTIONS = ["Sleeveless", "Short Sleeve", "3/4 Sleeve", "Full Sleeve", "Flutter Sleeves", "Bell Sleeve", "Cap Sleeve", "Off-Shoulder"];
 const LENGTH_OPTIONS = ["Under Bust", "Waist Length", "Hip Length", "Knee Length", "Midi", "Ankle Length", "Floor Length"];
 const NECKLINE_OPTIONS = ["Round Neck", "V-Neck", "Square Neck", "Sweetheart", "Halter", "Boat Neck", "Collar", "Off-Shoulder"];
 const FIT_OPTIONS = ["Regular", "Slim", "Relaxed", "Oversized", "Flared", "Bodycon", "A-Line"];
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "Free Size"];
-const COLOR_OPTIONS = ["Red", "Blue", "Green", "Black", "White", "Pink", "Yellow", "Purple", "Orange", "Maroon", "Navy", "Beige", "Grey", "Multicolor"];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface VariantRow {
-    id: string; // local key only
+    id: string;
     sku: string;
     size: string;
     color: string;
@@ -29,43 +40,28 @@ interface VariantRow {
     is_unlimited_stock: boolean;
 }
 
-// ─── Combobox ─────────────────────────────────────────────────────────────────
-function Combobox({
-    name,
-    label,
-    options,
-    placeholder,
-}: {
-    name: string;
-    label: string;
-    options: string[];
-    placeholder?: string;
-}) {
+// ─── Precision Combobox ──────────────────────────────────────────────────────
+function Combobox({ name, label, options, placeholder }: { name: string; label: string; options: string[]; placeholder?: string }) {
     const [value, setValue] = useState("");
     const [open, setOpen] = useState(false);
     const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()));
 
     return (
-        <div className="space-y-2 relative">
-            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">{label}</label>
+        <div className="space-y-1 relative">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{label}</label>
             <input type="hidden" name={name} value={value} />
             <input
                 value={value}
                 onChange={(e) => { setValue(e.target.value); setOpen(true); }}
                 onFocus={() => setOpen(true)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
-                placeholder={placeholder || `Select or type ${label}...`}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                onBlur={() => setTimeout(() => setOpen(false), 200)}
+                placeholder={placeholder || `Select or type...`}
+                className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[12px] font-bold text-slate-900 outline-none focus:border-slate-900 transition-all placeholder:text-slate-300 h-9"
             />
             {open && filtered.length > 0 && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden max-h-48 overflow-y-auto">
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-xl overflow-hidden max-h-48 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-200">
                     {filtered.map((opt) => (
-                        <button
-                            key={opt}
-                            type="button"
-                            onMouseDown={() => { setValue(opt); setOpen(false); }}
-                            className="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-fuchsia-50 hover:text-fuchsia-700 transition-colors"
-                        >
+                        <button key={opt} type="button" onMouseDown={() => { setValue(opt); setOpen(false); }} className="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors">
                             {opt}
                         </button>
                     ))}
@@ -75,188 +71,6 @@ function Combobox({
     );
 }
 
-// ─── Bulk Add Tool ────────────────────────────────────────────────────────────
-function BulkAddTool({ onGenerate }: { onGenerate: (color: string, sizes: string[]) => void }) {
-    const [color, setColor] = useState("");
-    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
-
-    const toggleSize = (s: string) => {
-        setSelectedSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-    };
-
-    const handleAdd = () => {
-        if (!color || selectedSizes.length === 0) return;
-        onGenerate(color, selectedSizes);
-        setColor("");
-        setSelectedSizes([]);
-    };
-
-    return (
-        <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-6 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">Quick Bulk Add</h3>
-                <span className="text-[9px] font-bold text-fuchsia-500 bg-fuchsia-50 px-2 py-1 rounded-md">PRO TIP</span>
-            </div>
-            <div className="grid gap-6 sm:grid-cols-12 items-end">
-                <div className="sm:col-span-4 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Common Color</label>
-                    <input
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        placeholder="e.g. Emerald Green"
-                        className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                    />
-                </div>
-                <div className="sm:col-span-6 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Select Sizes</label>
-                    <div className="flex flex-wrap gap-2">
-                        {SIZE_OPTIONS.map(s => (
-                            <button
-                                key={s}
-                                type="button"
-                                onClick={() => toggleSize(s)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${selectedSizes.includes(s)
-                                    ? "bg-slate-900 text-white shadow-lg scale-105"
-                                    : "bg-white border border-slate-200 text-slate-400 hover:border-slate-300"
-                                    }`}
-                            >
-                                {s}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                <div className="sm:col-span-2">
-                    <button
-                        type="button"
-                        onClick={handleAdd}
-                        disabled={!color || selectedSizes.length === 0}
-                        className="w-full h-[47px] bg-white border-2 border-slate-950 text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-950 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed group"
-                    >
-                        Generate
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-function VariantRowItem({
-    row,
-    index,
-    onUpdate,
-    onRemove,
-    onDuplicate,
-}: {
-    row: VariantRow;
-    index: number;
-    onUpdate: (id: string, field: keyof VariantRow, value: string | boolean) => void;
-    onRemove: (id: string) => void;
-    onDuplicate: (id: string) => void;
-}) {
-    return (
-        <div className="grid grid-cols-12 gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-fuchsia-100 transition-colors">
-            {/* Row number */}
-            <div className="col-span-12 sm:col-span-1 flex items-center">
-                <span className="h-7 w-7 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
-                    {index + 1}
-                </span>
-            </div>
-
-            {/* SKU */}
-            <div className="col-span-12 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">SKU</label>
-                <input
-                    value={row.sku}
-                    onChange={(e) => onUpdate(row.id, "sku", e.target.value)}
-                    placeholder="e.g. SILK-RED-L"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10"
-                />
-            </div>
-
-            {/* Size */}
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Size</label>
-                <input
-                    type="text"
-                    value={row.size}
-                    onChange={(e) => onUpdate(row.id, "size", e.target.value)}
-                    placeholder="e.g. XL"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10"
-                />
-            </div>
-
-            {/* Color */}
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Color</label>
-                <input
-                    type="text"
-                    value={row.color}
-                    onChange={(e) => onUpdate(row.id, "color", e.target.value)}
-                    placeholder="e.g. Ruby Red"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10"
-                />
-            </div>
-
-            {/* Price */}
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Price (NPR)</label>
-                <input
-                    type="number"
-                    min="0"
-                    value={row.price}
-                    onChange={(e) => onUpdate(row.id, "price", e.target.value)}
-                    placeholder="2500"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10"
-                />
-            </div>
-
-            {/* Stock / Unlimited toggle */}
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Stock</label>
-                {row.is_unlimited_stock ? (
-                    <div className="flex items-center h-9 px-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Unlimited</span>
-                    </div>
-                ) : (
-                    <input
-                        type="number"
-                        min="0"
-                        value={row.stock_quantity}
-                        onChange={(e) => onUpdate(row.id, "stock_quantity", e.target.value)}
-                        placeholder="50"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10"
-                    />
-                )}
-            </div>
-
-            {/* Controls */}
-            <div className="col-span-12 sm:col-span-1 flex flex-col items-end gap-2 pt-1 border-l border-slate-200 pl-2">
-                <button
-                    type="button"
-                    title="Duplicate this row"
-                    onClick={() => onDuplicate(row.id)}
-                    className="h-7 w-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all">
-                    <Copy className="w-3 h-3" />
-                </button>
-                <button
-                    type="button"
-                    title={row.is_unlimited_stock ? "Switch to fixed stock" : "Set as unlimited"}
-                    onClick={() => onUpdate(row.id, "is_unlimited_stock", !row.is_unlimited_stock)}
-                    className={`h-7 w-7 rounded-full flex items-center justify-center border text-[9px] font-black transition-all ${row.is_unlimited_stock
-                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md font-sans"
-                        : "bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-500"
-                        }`}>
-                    ∞
-                </button>
-                <button type="button" onClick={() => onRemove(row.id)}
-                    className="h-7 w-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-300 hover:border-rose-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
-                    <Trash2 className="w-3 h-3" />
-                </button>
-            </div>
-        </div>
-    );
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function NewProductPage() {
     const router = useRouter();
     const { token } = useAuth();
@@ -270,27 +84,27 @@ export default function NewProductPage() {
     const [variants, setVariants] = useState<VariantRow[]>([]);
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
     const [successInfo, setSuccessInfo] = useState<string | null>(null);
+
+    // Bulk Tool State
+    const [bulkColor, setBulkColor] = useState("");
+    const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!token) return;
-
-        // Fetch both Categories and Brands
         Promise.all([
             fetchBackofficeCategories(token),
             fetchBackofficeBrands(token)
         ]).then(([catData, brandData]: [any, any]) => {
             setCategories(Array.isArray(catData) ? catData : catData?.results || []);
             setBrands(Array.isArray(brandData) ? brandData : brandData?.results || []);
-        }).catch(() => { });
+        });
     }, [token]);
 
     const addVariantRow = () => {
-        setVariants((prev) => [
-            ...prev,
-            { id: crypto.randomUUID(), sku: "", size: "", color: "", price: "", stock_quantity: "", is_unlimited_stock: false },
-        ]);
+        setVariants([...variants, { id: crypto.randomUUID(), sku: "", size: "", color: "", price: "", stock_quantity: "0", is_unlimited_stock: false }]);
     };
 
     const generateSmartSKU = (name: string, size: string, color: string) => {
@@ -298,21 +112,16 @@ export default function NewProductPage() {
         const p = clean(name || "PROD");
         const c = clean(color || "");
         const s = clean(size || "");
-
-        let sku = p;
-        if (c) sku += `-${c}`;
-        if (s) sku += `-${s}`;
-        return sku;
+        return `${p}${c ? '-' + c : ''}${s ? '-' + s : ''}`;
     };
 
     const updateVariant = (id: string, field: keyof VariantRow, value: string | boolean) => {
-        setVariants((prev) => prev.map((v) => {
+        setVariants(variants.map(v => {
             if (v.id === id) {
                 const updated = { ...v, [field]: value };
-                // Smart SKU suggestion: If SKU is empty and we just updated size/color
                 if (!updated.sku && (field === "size" || field === "color")) {
-                    const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
-                    updated.sku = generateSmartSKU(productName, updated.size, updated.color);
+                    const prodName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
+                    updated.sku = generateSmartSKU(prodName, updated.size, updated.color);
                 }
                 return updated;
             }
@@ -320,397 +129,265 @@ export default function NewProductPage() {
         }));
     };
 
-    const bulkAddVariants = (color: string, selectedSizes: string[]) => {
-        const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
+    const bulkAddVariants = () => {
+        if (!bulkColor || selectedSizes.length === 0) return;
+        const prodName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
         const basePrice = (document.getElementsByName("base_price")[0] as HTMLInputElement)?.value || "";
-
         const newRows = selectedSizes.map(size => ({
             id: crypto.randomUUID(),
-            color: color,
-            size: size,
-            price: basePrice,
-            stock_quantity: "0",
-            is_unlimited_stock: false,
-            sku: generateSmartSKU(productName, size, color)
+            sku: generateSmartSKU(prodName, size, bulkColor),
+            size, color: bulkColor, price: basePrice, stock_quantity: "0", is_unlimited_stock: false
         }));
-
-        setVariants(prev => [...prev, ...newRows]);
-    };
-
-    const duplicateVariant = (id: string) => {
-        const source = variants.find(v => v.id === id);
-        if (!source) return;
-        setVariants([...variants, {
-            ...source,
-            id: crypto.randomUUID(),
-            size: "",
-            sku: ""
-        }]);
-    };
-
-    const removeVariant = (id: string) => {
-        setVariants((prev) => prev.filter((v) => v.id !== id));
+        setVariants([...variants, ...newRows]);
+        setBulkColor(""); setSelectedSizes([]);
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!token) return;
-
-        const form = e.currentTarget;
-        const raw = new FormData(form);
-
-        // ── Validation ──────────────────────────────────────────────────────────
-        const name = (raw.get("name") as string)?.trim();
-        if (!name) { setErrorInfo("Please enter a Product Name before publishing."); return; }
-
-        const basePrice = (raw.get("base_price") as string)?.trim();
-        if (!basePrice) { setErrorInfo("Please enter a Base Price before publishing."); return; }
-
-        if (variants.length > 0) {
-            for (const v of variants) {
-                if (!v.size || !v.color || !v.price) {
-                    setErrorInfo("Each variant must have a Size, Color, and Price filled in.");
-                    return;
-                }
-            }
-        }
-
         setLoading(true);
-        setErrorInfo(null);
-
-        // ── Build payload ────────────────────────────────────────────────────────
+        const formData = new FormData(e.currentTarget);
         const payload = new FormData();
-        payload.append("name", name);
+        payload.append("name", formData.get("name") as string);
+        payload.append("description", formData.get("description") as string || "");
+        payload.append("base_price", formData.get("base_price") as string);
+        payload.append("price", formData.get("base_price") as string);
+        payload.append("category_id", formData.get("category_id") as string);
+        const brandId = formData.get("brand_id") as string;
+        if (brandId && brandId !== "") {
+            payload.append("brand_id", brandId);
+        }
+        payload.append("is_visible", formData.get("is_visible") === "on" ? "true" : "false");
 
-        const description = (raw.get("description") as string)?.trim();
-        if (description) payload.append("description", description);
-
-        // Double mapping for backend safety (in case DB field is `price` instead of `base_price`)
-        payload.append("base_price", basePrice);
-        payload.append("price", basePrice);
-
-        const category_id = raw.get("category_id") as string;
-        if (category_id) payload.append("category_id", category_id);
-
-        const brand_id = raw.get("brand_id") as string;
-        if (brand_id) payload.append("brand_id", brand_id);
-
-        // Design attributes
-        ["material", "sleeve", "length", "neck_line", "fit"].forEach((field) => {
-            const val = (raw.get(field) as string)?.trim();
-            if (val) payload.append(field, val);
+        ["material", "sleeve", "length", "neck_line", "fit"].forEach(f => {
+            const v = formData.get(f) as string;
+            if (v) payload.append(f, v);
         });
 
-        // Visibility
-        const isVisible = raw.get("is_visible") === "true";
-        payload.append("is_visible", isVisible ? "true" : "false");
-
-        // Main image
         if (imageFile) payload.append("image", imageFile);
-
-        // Gallery images
-        if (galleryFiles.length > 0) {
-            galleryFiles.forEach(file => {
-                payload.append("images", file);
-            });
-        }
-
-        // Variants — serialized as JSON string per backend spec
+        galleryFiles.forEach(f => payload.append("images", f));
         if (variants.length > 0) {
-            const variantPayload = variants.map(({ id: _id, ...v }) => ({
-                ...v,
-                price: Number(v.price),
-                stock_quantity: v.is_unlimited_stock ? 0 : Number(v.stock_quantity || 0),
-            }));
-            payload.append("variants", JSON.stringify(variantPayload));
+            const vPayload = variants.map(({ id: _, ...v }) => ({ ...v, price: Number(v.price), stock_quantity: v.is_unlimited_stock ? 0 : Number(v.stock_quantity || 0) }));
+            payload.append("variants", JSON.stringify(vPayload));
         }
 
         try {
             await createProduct(payload, token);
-            setSuccessInfo("Product published successfully!");
+            setSuccessInfo("Product synchronized successfully.");
             setTimeout(() => router.push("/backoffice/catalog"), 1000);
         } catch (err: any) {
-            setErrorInfo(err.message || "Something went wrong. Please check your inputs and try again.");
+            setErrorInfo(err.message || "Publication failed.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+        <div className="max-w-[1400px] mx-auto py-8 px-8 space-y-10 animate-in fade-in duration-500 pb-24">
             <AlertBanner message={errorInfo || ""} type="error" onClose={() => setErrorInfo(null)} />
-            <AlertBanner message={successInfo || ""} type="success" onClose={() => setSuccessInfo(null)} />
+            {successInfo && <AlertBanner message={successInfo} type="success" onClose={() => setSuccessInfo(null)} />}
 
-            {/* ── Page Header ─────────────────────────────────────────────────── */}
-            <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50">
-                <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="text-[10px] uppercase tracking-widest font-black text-slate-400 hover:text-slate-900 transition flex items-center gap-2 mb-6"
-                >
-                    ← Back to Products
-                </button>
-                <p className="text-[10px] uppercase tracking-[0.4em] font-black text-fuchsia-600">Product Studio</p>
-                <h1 className="mt-2 text-4xl font-black text-slate-900 leading-tight">Add New Product</h1>
-                <p className="mt-3 text-sm font-medium text-slate-400 max-w-xl">
-                    Fill in all the details below and hit <strong>Publish Product</strong> when ready.
-                </p>
+            {/* HEADER */}
+            <div className="flex items-end justify-between border-b pb-6">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-900 transition"><ChevronLeft className="w-5 h-5" /></button>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Catalog Registry</span>
+                        <ArrowRight className="w-3 h-3 text-slate-200" />
+                        <span className="text-[10px] font-bold text-slate-900 uppercase tracking-widest">New Production Item</span>
+                    </div>
+                    <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Create Technical Item</h1>
+                    <p className="text-sm text-slate-500 font-medium tracking-tight">Define commercial parameters and technical variants for storefront publication.</p>
+                </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-3">
+            <form onSubmit={handleSubmit} className="grid grid-cols-12 gap-10">
+                {/* MAIN CONTENT */}
+                <div className="col-span-8 space-y-12">
 
-                {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-                <div className="lg:col-span-2 space-y-8">
-
-                    {/* Essential Info */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Essential Information</h2>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">
-                                Product Name <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                name="name"
-                                required
-                                type="text"
-                                placeholder="e.g. Silk Wrap Dress"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                            />
+                    {/* IDENTITY & ATTRIBUTES */}
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2.5">
+                            <Tag className="w-4 h-4 text-slate-400" />
+                            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Product Identity</h2>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Description</label>
-                            <textarea
-                                name="description"
-                                rows={4}
-                                placeholder="Describe the garment — styling, occasion, fit notes..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition resize-none"
-                            />
-                        </div>
-                    </section>
-
-                    {/* Fashion Design Attributes */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <div className="border-b border-slate-100 pb-4">
-                            <h2 className="text-lg font-black text-slate-900">Design Attributes</h2>
-                            <p className="text-xs text-slate-400 font-medium mt-1">These power the storefront filters and reel-to-product linking.</p>
-                        </div>
-
-                        <div className="grid gap-5 sm:grid-cols-2">
-                            <Combobox name="material" label="Material" options={MATERIAL_OPTIONS} placeholder="e.g. Georgette" />
-                            <Combobox name="sleeve" label="Sleeve Type" options={SLEEVE_OPTIONS} placeholder="e.g. Flutter Sleeves" />
-                            <Combobox name="length" label="Length" options={LENGTH_OPTIONS} placeholder="e.g. Midi" />
-                            <Combobox name="neck_line" label="Neck Line" options={NECKLINE_OPTIONS} placeholder="e.g. V-Neck" />
-                            <Combobox name="fit" label="Fit" options={FIT_OPTIONS} placeholder="e.g. Regular" />
-                        </div>
-                    </section>
-
-                    {/* Variants Matrix */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                            <div>
-                                <h2 className="text-lg font-black text-slate-900">Size & Color Variants</h2>
-                                <p className="text-xs text-slate-400 font-medium mt-1">Each row is a unique purchasable unit (e.g. Red / XL).</p>
+                        <div className="bg-white border rounded-md p-8 space-y-6 shadow-sm">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Full Product Title</label>
+                                <input name="name" required placeholder="Enter product name..." className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-[14px] font-bold text-slate-900 outline-none focus:border-slate-900 h-10 transition-all" />
                             </div>
+                            <div className="space-y-1.5 pt-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Production Description</label>
+                                <textarea name="description" rows={4} placeholder="Describe construction and fit details..." className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-[13px] font-medium outline-none focus:border-slate-900 resize-none transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5 pt-5 border-t border-slate-100">
+                                <Combobox name="material" label="Fabric / Material" options={MATERIAL_OPTIONS} />
+                                <Combobox name="sleeve" label="Sleeve Type" options={SLEEVE_OPTIONS} />
+                                <Combobox name="length" label="Garment Length" options={LENGTH_OPTIONS} />
+                                <Combobox name="neck_line" label="Neckline Style" options={NECKLINE_OPTIONS} />
+                                <Combobox name="fit" label="Intended Fit" options={FIT_OPTIONS} />
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* VARIANT GENERATOR & MATRIX */}
+                    <section className="space-y-8">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <Zap className="w-4 h-4 text-emerald-500" />
+                                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Inventory Variants</h2>
+                            </div>
+                            <button type="button" onClick={addVariantRow} className="text-[11px] font-bold text-slate-900 hover:underline flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Add Manual Row</button>
+                        </div>
+
+                        {/* BULK ADD BAR */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-md p-5 flex items-center gap-6 shadow-sm">
+                            <div className="flex-1 space-y-1">
+                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Matrix Color</label>
+                                <input value={bulkColor} onChange={e => setBulkColor(e.target.value)} placeholder="e.g. Ruby Red" className="w-full bg-white border border-slate-200 rounded px-3 py-1.5 text-[11px] font-bold outline-none focus:border-emerald-500 h-9" />
+                            </div>
+                            <div className="flex-[2] space-y-1">
+                                <label className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Target Sizes</label>
+                                <div className="flex gap-1.5">
+                                    {SIZE_OPTIONS.map(s => (
+                                        <button
+                                            key={s} type="button"
+                                            onClick={() => setSelectedSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])}
+                                            className={`px-2.5 py-1.5 rounded text-[10px] font-bold transition-all border ${selectedSizes.includes(s) ? 'bg-slate-900 border-slate-900 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-400'}`}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button type="button" onClick={bulkAddVariants} disabled={!bulkColor || selectedSizes.length === 0} className="h-9 bg-emerald-600 text-white px-5 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 disabled:opacity-30 transition-all self-end">Generate</button>
+                        </div>
+
+                        {/* DATA GRID */}
+                        <div className="bg-white border rounded-md shadow-sm overflow-hidden">
+                            <table className="w-full text-left border-collapse table-fixed">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b">
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[25%] text-left">Technical SKU</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[12%] text-left">Size</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[18%] text-left">Color</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[18%] text-left">Price (NPR)</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[17%] text-left">Stock Qty</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[10%] text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {variants.length === 0 ? (
+                                        <tr><td colSpan={6} className="px-6 py-20 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">No matrix entries defined.</td></tr>
+                                    ) : (
+                                        variants.map((v) => (
+                                            <tr key={v.id} className="hover:bg-slate-50/40 transition-colors h-14">
+                                                <td className="px-3"><input value={v.sku} onChange={e => updateVariant(v.id, "sku", e.target.value)} placeholder="SKU-..." className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3"><input value={v.size} onChange={e => updateVariant(v.id, "size", e.target.value)} placeholder="..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3"><input value={v.color} onChange={e => updateVariant(v.id, "color", e.target.value)} placeholder="..." className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3"><input type="number" value={v.price} onChange={e => updateVariant(v.id, "price", e.target.value)} placeholder="0.00" className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-[11px] font-bold outline-none focus:border-slate-900 h-9" /></td>
+                                                <td className="px-3">
+                                                    <div className="flex items-center gap-1.5 h-9">
+                                                        <input type="number" disabled={v.is_unlimited_stock} value={v.stock_quantity} onChange={e => updateVariant(v.id, "stock_quantity", e.target.value)} className="w-full bg-white border border-slate-200 rounded px-2 py-1.5 text-[11px] font-bold outline-none disabled:opacity-20 h-full" />
+                                                        <button type="button" onClick={() => updateVariant(v.id, "is_unlimited_stock", !v.is_unlimited_stock)} className={`w-8 h-8 shrink-0 rounded border flex items-center justify-center transition-all ${v.is_unlimited_stock ? 'bg-slate-900 border-slate-900 text-white shadow-sm' : 'text-slate-300 border-slate-100'}`}><span className="text-[10px] font-black">∞</span></button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        <button type="button" onClick={() => setVariants([...variants, { ...v, id: crypto.randomUUID(), sku: "" }])} className="text-slate-300 hover:text-slate-900 hover:bg-slate-100 p-1.5 rounded transition-all"><Copy className="w-3.5 h-3.5" /></button>
+                                                        <button type="button" onClick={() => setVariants(variants.filter(x => x.id !== v.id))} className="text-slate-200 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                {/* SIDEBAR BARK */}
+                <div className="col-span-4 space-y-12">
+                    {/* PRODUCTION ASSETS */}
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2.5">
+                            <Camera className="w-4 h-4 text-slate-400" />
+                            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Asset Workbench</h2>
+                        </div>
+                        <div className="bg-white border rounded-md p-6 space-y-6 shadow-sm">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Primary Product Creative</label>
+                                <div onClick={() => fileInputRef.current?.click()} className="aspect-[3/4] rounded border-2 border-dashed bg-slate-50 flex items-center justify-center relative overflow-hidden group cursor-pointer hover:border-slate-300 transition-all duration-300 shadow-inner">
+                                    {imagePreview ? <img src={imagePreview} className="w-full h-full object-cover" /> : <div className="text-center"><ImageIcon className="w-6 h-6 mx-auto text-slate-200 mb-2" /><p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Upload Portrait</p></div>}
+                                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) { setImageFile(f); setImagePreview(URL.createObjectURL(f)); } }} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Carousel Gallery</label>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    {galleryPreviews.slice(0, 5).map((p, i) => <div key={i} className="aspect-square rounded border bg-slate-50 overflow-hidden"><img src={p} className="w-full h-full object-cover" /></div>)}
+                                    <div onClick={() => galleryInputRef.current?.click()} className="aspect-square rounded border-2 border-dashed bg-slate-200/40 flex items-center justify-center cursor-pointer hover:border-slate-300 hover:bg-white transition-all text-slate-300"><Plus className="w-4 h-4" /></div>
+                                    <input ref={galleryInputRef} type="file" multiple accept="image/*" className="hidden" onChange={e => { const fs = Array.from(e.target.files || []); setGalleryFiles([...galleryFiles, ...fs]); setGalleryPreviews([...galleryPreviews, ...fs.map(f => URL.createObjectURL(f))]); }} />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* COMMERCIAL CONTROLS */}
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2.5">
+                            <Layers className="w-4 h-4 text-slate-400" />
+                            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Commercial Controls</h2>
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-md p-8 shadow-sm space-y-8 ring-1 ring-slate-100">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Standard Base Price</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold border-r pr-3">NPR</span>
+                                    <input name="base_price" required type="number" placeholder="0.00" className="w-full bg-white border border-slate-200 rounded px-16 py-3.5 text-[18px] font-black text-slate-950 outline-none focus:border-slate-900 transition-all shadow-sm" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 pt-6 border-t border-slate-200">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storefront Category</label>
+                                    <select name="category_id" required className="w-full bg-white border border-slate-200 rounded px-3 py-2.5 text-[12px] font-bold text-slate-900 outline-none cursor-pointer hover:border-slate-900 transition-all appearance-none shadow-sm">
+                                        <option value="">Select Assignment...</option>
+                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Brand Registry</label>
+                                    <select name="brand_id" className="w-full bg-white border border-slate-200 rounded px-3 py-2.5 text-[12px] font-bold text-slate-900 outline-none cursor-pointer hover:border-slate-900 transition-all appearance-none shadow-sm">
+                                        <option value="">Private Label / No Brand</option>
+                                        {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-slate-200 flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <span className="text-[11px] font-black text-slate-900 tracking-tight leading-none uppercase">Public Storefront</span>
+                                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Sync live on publish</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="is_visible" defaultChecked className="sr-only peer" />
+                                    <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:bg-emerald-500 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:rounded-full after:h-3 after:w-3 after:transition-all"></div>
+                                </label>
+                            </div>
+
                             <button
-                                type="button"
-                                onClick={addVariantRow}
-                                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-fuchsia-600 transition-colors"
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-slate-950 text-white py-4 rounded font-black text-[12px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-2xl shadow-slate-200"
                             >
-                                <span className="text-lg leading-none">+</span> Add Row
+                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                {loading ? 'PUBLISHING...' : 'PUBLISH PRODUCT →'}
                             </button>
                         </div>
-
-                        <BulkAddTool onGenerate={bulkAddVariants} />
-
-                        {variants.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200">
-                                <span className="text-3xl opacity-20 mb-3">📦</span>
-                                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No variants yet</p>
-                                <p className="text-xs text-slate-300 font-medium mt-1">Click "Add Row" to create your first size/color option.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {variants.map((v, i) => (
-                                    <VariantRowItem
-                                        key={v.id}
-                                        row={v}
-                                        index={i}
-                                        onUpdate={updateVariant}
-                                        onRemove={removeVariant}
-                                        onDuplicate={duplicateVariant}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-                        {variants.length > 0 && (
-                            <div className="pt-2 flex items-center gap-2 text-[10px] text-slate-400 font-black">
-                                <span className="text-emerald-500">∞</span> = Unlimited stock toggle per variant
-                            </div>
-                        )}
                     </section>
                 </div>
-
-                {/* ── RIGHT SIDEBAR ─────────────────────────────────────────────── */}
-                <div className="space-y-8">
-
-                    {/* Image Upload */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Main Photo</h2>
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="group relative aspect-[3/4] rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 hover:bg-slate-100 transition cursor-pointer overflow-hidden"
-                        >
-                            {imagePreview ? (
-                                <img
-                                    src={imagePreview}
-                                    className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition duration-700"
-                                    alt="Preview"
-                                />
-                            ) : (
-                                <>
-                                    <span className="text-4xl opacity-20 group-hover:scale-125 transition duration-500">🖼️</span>
-                                    <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Click to Upload</p>
-                                    <p className="text-[9px] text-slate-300 font-medium">JPG, PNG, WEBP</p>
-                                </>
-                            )}
-                            {imagePreview && (
-                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                    <p className="text-white text-[10px] font-black uppercase tracking-widest">Change Photo</p>
-                                </div>
-                            )}
-                        </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); }
-                            }}
-                        />
-                    </section>
-
-                    {/* Gallery Photos */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Gallery Photos</h2>
-                        <div className="grid grid-cols-2 gap-4">
-                            {galleryPreviews.map((preview, idx) => (
-                                <div key={idx} className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-100">
-                                    <img src={preview} className="h-full w-full object-cover" alt={`Gallery ${idx + 1}`} />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setGalleryFiles(prev => prev.filter((_, i) => i !== idx));
-                                            setGalleryPreviews(prev => prev.filter((_, i) => i !== idx));
-                                        }}
-                                        className="absolute top-2 right-2 h-6 w-6 rounded-full bg-white/90 text-rose-500 font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            ))}
-                            <div
-                                onClick={() => galleryInputRef.current?.click()}
-                                className="group relative aspect-square rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-100 transition cursor-pointer"
-                            >
-                                <span className="text-2xl opacity-20 group-hover:scale-110 transition duration-300">📸</span>
-                                <p className="text-[9px] uppercase font-black tracking-widest text-slate-400">Add Photo</p>
-                            </div>
-                        </div>
-                        <input
-                            ref={galleryInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={(e) => {
-                                if (!e.target.files) return;
-                                const files = Array.from(e.target.files);
-                                setGalleryFiles(prev => [...prev, ...files]);
-                                setGalleryPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
-                            }}
-                        />
-                    </section>
-
-                    {/* Classification */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Classification</h2>
-
-                        <div className="grid gap-6 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
-                                <select
-                                    name="category_id"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                                >
-                                    <option value="">Select Category</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Brand</label>
-                                <select
-                                    name="brand_id"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                                >
-                                    <option value="">No Brand / Private Label</option>
-                                    {brands.map((brand) => (
-                                        <option key={brand.id} value={brand.id}>{brand.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">
-                                Base Price (NPR) <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                                name="base_price"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                required
-                                placeholder="e.g. 2500"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                            />
-                            <p className="text-[9px] text-slate-400 font-medium">Used as the display price. Individual variant prices override this.</p>
-                        </div>
-
-                        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Store Visibility</h3>
-                                <p className="text-[10px] text-slate-400 mt-0.5">Toggle to hide this from the main catalog.</p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="is_visible" defaultChecked className="sr-only peer" value="true" />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                            </label>
-                        </div>
-                    </section>
-
-                    {/* Publish */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-5">
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-6 text-[10px] uppercase tracking-widest font-black h-auto"
-                        >
-                            {loading ? "Publishing..." : "Publish Product →"}
-                        </Button>
-                        <p className="text-center text-[9px] text-slate-400 font-medium leading-relaxed">
-                            This will immediately make the product visible to storefront customers.
-                        </p>
-                    </section>
-                </div>
-
             </form>
         </div>
     );

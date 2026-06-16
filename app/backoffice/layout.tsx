@@ -53,15 +53,6 @@ export default function BackofficeLayout({ children }: { children: ReactNode }) 
           <Sidebar />
 
           <div className="flex-1 flex flex-col min-w-0 pl-64">
-            <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-8">
-              <div className="flex items-center gap-4">
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Operational Infrastructure // v2.0</span>
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 shadow-sm" />
-              </div>
-            </header>
-
             <main className="p-10 pb-20 max-w-[1600px] bg-[#fafafa]">
               {children}
             </main>

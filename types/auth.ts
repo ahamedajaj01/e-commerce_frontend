@@ -3,11 +3,17 @@ export type UserRole = "customer" | "admin" | "inventory" | "marketing" | "suppo
 export interface UserProfile {
   id: string;
   email: string;
-  name: string;
+  name?: string;
+  phone_number: string;
+  role: UserRole;
+  is_active: boolean;
   is_staff: boolean;
+  is_superuser: boolean;
   is_email_verified: boolean;
-  role: UserRole; // Doc says singular 'role'
-  roles?: UserRole[]; // Keep as internal normalized array
+  created_at: string;
+  updated_at: string;
+  last_login?: string;
+  roles?: UserRole[];
 }
 
 export interface AuthCredentials {
