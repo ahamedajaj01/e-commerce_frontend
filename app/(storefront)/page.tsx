@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import React from "react";
 
 import { ProductCard } from "@/components/storefront/ProductCard";
@@ -16,20 +19,19 @@ export default async function StorefrontHomePage() {
   let customCollections: any[] = [];
   let campaignBanners: any[] = [];
   try {
-    // Consolidated parallel fetch for all promotion segments
-    const [campaignPromos, bannerPromos, systemPromos, exclusivePromosRaw] = await Promise.all([
-      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("CAMPAIGN")),
-      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("BANNER")),
-      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("SYSTEM")),
-      import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions("EXCLUSIVE"))
-    ]);
+    // Fetch all promotions in a single parallel-friendly call to avoid multiple round-trips 
+    // and bypass any per-type pagination limits that might exist on the backend.
+    const allPromotions = await import("@/lib/api/cms").then(m => m.fetchStorefrontPromotions());
 
-    const promotions = [...campaignPromos, ...bannerPromos, ...systemPromos, ...exclusivePromosRaw];
+    const campaignPromos = allPromotions.filter(p => p.promotion_type === "CAMPAIGN");
+    const bannerPromos = allPromotions.filter(p => p.promotion_type === "BANNER");
+    const systemPromos = allPromotions.filter(p => p.promotion_type === "SYSTEM");
+    const exclusivePromosRaw = allPromotions.filter(p => p.promotion_type === "EXCLUSIVE");
 
     // Robust multi-source discovery for 'Trending' products on homepage
     // We check for "Homepage Selection" first, then "Trending Now" as a fallback
     // Discover primary homepage selection across SYSTEM and CAMPAIGN segments (for migration)
-    const homePromo = [...systemPromos, ...campaignPromos].find(p =>
+    const homePromo = allPromotions.find(p =>
       p.title === "Homepage Selection" ||
       p.title === "Trending Now" ||
       p.title.toLowerCase().replace(/\s+/g, '-') === "homepage-selection" ||
@@ -45,10 +47,12 @@ export default async function StorefrontHomePage() {
 
     // Strictly fetch collections created via the Exclusive Collection dashboard
     // Consolidate exclusive collections from dedicated EXCLUSIVE segments and legacy CAMPAIGN fallback
-    const filteredExclusive = [...exclusivePromosRaw, ...campaignPromos].filter(p =>
-      p.promotion_type === "EXCLUSIVE" ||
-      p.description === "Storefront Exclusive Collection" ||
-      (p as any).slug?.includes("exclusive")
+    const filteredExclusive = allPromotions.filter(p =>
+      p.is_visible !== false &&
+      p.is_active !== false &&
+      (p.promotion_type === "EXCLUSIVE" ||
+        p.description === "Storefront Exclusive Collection" ||
+        (p as any).slug?.includes("exclusive"))
     );
     customCollections = Array.from(new Map(filteredExclusive.map(p => [p.id, p])).values());
 

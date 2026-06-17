@@ -34,7 +34,10 @@ export async function fetchDiscoveryFeedBySlug(slug: string): Promise<DiscoveryF
 
 export async function fetchStorefrontPromotions(type?: string): Promise<Promotion[]> {
   try {
-    const url = type ? `/storefront/promotions/?type=${type}` : "/storefront/promotions/";
+    let url = "/storefront/promotions/?page_size=100";
+    if (type) {
+      url += `&type=${type}`;
+    }
     const data = await apiClient<any>(url);
     return Array.isArray(data) ? data : data?.results || [];
   } catch (err: any) {
