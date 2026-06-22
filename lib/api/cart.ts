@@ -20,8 +20,7 @@ import {
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 function cartUrl(path: string): string {
-  // Normalise: ensure /api/v1 prefix
-  const normalised = path.startsWith("/api/v1") ? path : `/api/v1${path}`;
+  const normalised = path.startsWith("/") ? path : `/${path}`;
   return `${BASE_URL}${normalised}`;
 }
 
