@@ -290,6 +290,18 @@ export default function CheckoutPage() {
                                                     <p className="text-[9px] mt-1 font-black italic text-white/60">
                                                         Estimated Arrival: {deliveryEstimation}
                                                     </p>
+
+                                                    {/* Granular Breakdown */}
+                                                    {(shippingResult.processing_days_max !== undefined || (shippingResult.transit_days_min !== undefined && shippingResult.transit_days_max !== undefined)) && (
+                                                        <div className="mt-2 flex gap-3 text-[8px] font-bold uppercase tracking-tighter text-white/40 border-t border-white/5 pt-2">
+                                                            {shippingResult.processing_days_max !== undefined && (
+                                                                <span>Warehouse: {shippingResult.processing_days_max} {shippingResult.processing_days_max === 1 ? 'Day' : 'Days'}</span>
+                                                            )}
+                                                            {shippingResult.transit_days_min !== undefined && (
+                                                                <span>Courier: {shippingResult.transit_days_min}-{shippingResult.transit_days_max} Days</span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <p className="text-sm font-black text-right">Rs {shippingResult.fee}</p>
                                             </div>

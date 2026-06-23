@@ -5,6 +5,7 @@ import type {
     ShippingCalculationRequest,
     ShippingCalculationResult,
 } from "@/types/shipping";
+import { buildGuestTokenHeaders } from "./guestToken";
 
 // ─── BACKOFFICE API ─────────────────────────────────────────────────────────
 
@@ -95,5 +96,6 @@ export async function calculateShipping(
     return apiClient<ShippingCalculationResult>("/storefront/shipping/calculate/", {
         method: "POST",
         body: data as any,
+        headers: buildGuestTokenHeaders(),
     });
 }
