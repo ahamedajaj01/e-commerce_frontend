@@ -31,6 +31,8 @@ const EMPTY_FORM: CreateShippingRule = {
     district: "",
     city_or_municipality: "",
     shipping_fee: 0,
+    transit_days_min: 0,
+    transit_days_max: 0,
     estimated_days: "",
     is_default: false,
     is_active: true,
@@ -256,6 +258,8 @@ export default function ShippingDeliveryPage() {
             district: rule.district || "",
             city_or_municipality: rule.city_or_municipality || "",
             shipping_fee: Number(rule.shipping_fee),
+            transit_days_min: rule.transit_days_min || 0,
+            transit_days_max: rule.transit_days_max || 0,
             estimated_days: rule.estimated_days || "",
             is_default: rule.is_default,
             is_active: rule.is_active,
@@ -675,7 +679,43 @@ export default function ShippingDeliveryPage() {
                                         className={INPUT}
                                     />
                                 </Field>
-                                <Field label="Estimated Delivery" required>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Field label="Transit Days Min" required>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0"
+                                        placeholder="e.g. 1"
+                                        value={formData.transit_days_min || ""}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                transit_days_min: Number(e.target.value),
+                                            })
+                                        }
+                                        className={INPUT}
+                                    />
+                                </Field>
+                                <Field label="Transit Days Max" required>
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0"
+                                        placeholder="e.g. 3"
+                                        value={formData.transit_days_max || ""}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                transit_days_max: Number(e.target.value),
+                                            })
+                                        }
+                                        className={INPUT}
+                                    />
+                                </Field>
+                            </div>
+                            <div className="space-y-4">
+                                <Field label="Legacy Estimated ETA (String)" required>
                                     <input
                                         required
                                         type="text"

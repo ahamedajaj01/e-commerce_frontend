@@ -76,6 +76,16 @@ export default async function ProductDetailPage({ params }: Props) {
                       {product.variants?.reduce((acc, v) => acc + (v.stock_quantity || 0), 0)} in stock
                     </span>
                   </div>
+
+                  {/* Delivery Signal: Processing Time */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest leading-none">
+                      {product.processing_days_max && product.processing_days_max > 0
+                        ? `Usually dispatches in ${product.processing_days_min}-${product.processing_days_max} business days`
+                        : "Ready for immediate dispatch"}
+                    </p>
+                  </div>
                 </div>
               </div>
 

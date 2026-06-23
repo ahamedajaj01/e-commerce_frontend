@@ -10,6 +10,8 @@ export interface ShippingRule {
     district?: string;
     city_or_municipality?: string;
     shipping_fee: number;
+    transit_days_min?: number;
+    transit_days_max?: number;
     estimated_days: string;
     is_default: boolean;
     is_active: boolean;
@@ -26,6 +28,8 @@ export interface CreateShippingRule {
     district?: string;
     city_or_municipality?: string;
     shipping_fee: number;
+    transit_days_min?: number;
+    transit_days_max?: number;
     estimated_days: string;
     is_default: boolean;
     is_active: boolean;
@@ -39,8 +43,12 @@ export interface CreateShippingRule {
 export interface ShippingCalculationResult {
     rule_id: string;
     title: string;
-    fee: number;
+    fee: number | string;
     estimated_days: string;
+    transit_days_min?: number;
+    transit_days_max?: number;
+    processing_days_max?: number; // 🆕 Added for pre-calculated warehouse time
+    arrival_estimate?: string;     // 🆕 Added for pre-calculated total sum
 }
 
 /**

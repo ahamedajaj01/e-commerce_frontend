@@ -14,6 +14,8 @@ export interface CartItem {
   product_id?: string;
   quantity: number;
   subtotal: string;
+  processing_days_min?: number;
+  processing_days_max?: number;
 }
 
 export interface Cart {

@@ -153,6 +153,29 @@ export default function CheckoutPage() {
         return (base + fee).toFixed(2);
     }, [cart?.total_price, shippingResult]);
 
+    // Updated: Prefer pre-calculated arrival estimate from backend
+    const deliveryEstimation = useMemo(() => {
+        if (!shippingResult) return null;
+
+        // If backend provided the pre-summed arrival estimate, use it directly
+        if (shippingResult.arrival_estimate) {
+            return shippingResult.arrival_estimate;
+        }
+
+        // Fallback for older rule structures: Sum them manually
+        const maxProcessingMin = items.length > 0 ? Math.max(...items.map(i => i.processing_days_min || 0)) : 0;
+        const maxProcessingMax = items.length > 0 ? Math.max(...items.map(i => i.processing_days_max || 0)) : 0;
+
+        if (shippingResult.transit_days_min === undefined || shippingResult.transit_days_max === undefined) {
+            return shippingResult.estimated_days;
+        }
+
+        const deliveryMin = maxProcessingMin + shippingResult.transit_days_min;
+        const deliveryMax = maxProcessingMax + shippingResult.transit_days_max;
+
+        return `${deliveryMin} - ${deliveryMax} Business Days`;
+    }, [shippingResult, items]);
+
     return (
         <div className="bg-[#fcfcfc] min-h-screen text-slate-900 pb-20">
             <ResponsiveContainer className="py-10 lg:py-16">
@@ -264,7 +287,9 @@ export default function CheckoutPage() {
                                                         <Truck className="w-3 h-3 text-white" />
                                                         <p className="text-[10px] font-black uppercase tracking-widest">{shippingResult.title}</p>
                                                     </div>
-                                                    <p className="text-[9px] mt-1 font-black italic text-white/60">{shippingResult.estimated_days}</p>
+                                                    <p className="text-[9px] mt-1 font-black italic text-white/60">
+                                                        Estimated Arrival: {deliveryEstimation}
+                                                    </p>
                                                 </div>
                                                 <p className="text-sm font-black text-right">Rs {shippingResult.fee}</p>
                                             </div>

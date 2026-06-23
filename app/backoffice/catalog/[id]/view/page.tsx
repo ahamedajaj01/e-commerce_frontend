@@ -122,6 +122,12 @@ export default function ProductViewPage({ params }: { params: Promise<{ id: stri
                                 <p className="text-[11px] font-bold text-slate-900">{product.slug}</p>
                             </div>
                             <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Fulfillment (Processing)</p>
+                                <p className="text-[11px] font-bold text-slate-900">
+                                    {product.processing_days_min || 0} - {product.processing_days_max || 0} Days
+                                </p>
+                            </div>
+                            <div>
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Product ID</p>
                                 <p className="text-[11px] font-mono text-slate-500">{product.id}</p>
                             </div>

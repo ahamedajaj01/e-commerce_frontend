@@ -140,7 +140,7 @@ export default function NewProductPage() {
         }
         payload.append("is_visible", formData.get("is_visible") === "on" ? "true" : "false");
 
-        ["material", "sleeve", "length", "neck_line", "fit"].forEach(f => {
+        ["material", "sleeve", "length", "neck_line", "fit", "processing_days_min", "processing_days_max"].forEach(f => {
             const v = formData.get(f) as string;
             if (v) payload.append(f, v);
         });
@@ -213,6 +213,16 @@ export default function NewProductPage() {
                                 <TextInput name="length" label="Secondary Detail" placeholder="e.g. 50cm / Midi" />
                                 <TextInput name="neck_line" label="Styling / Connection" placeholder="e.g. Hook / V-Neck" />
                                 <TextInput name="fit" label="Standard Fit / Style" placeholder="e.g. Regular / Adjustable" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-6 pt-5 border-t border-slate-100">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Min Processing Days</label>
+                                    <input type="number" name="processing_days_min" placeholder="e.g. 1" className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold text-slate-900 outline-none focus:border-slate-900 h-9 transition-all" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Max Processing Days</label>
+                                    <input type="number" name="processing_days_max" placeholder="e.g. 2" className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-[13px] font-bold text-slate-900 outline-none focus:border-slate-900 h-9 transition-all" />
+                                </div>
                             </div>
                         </div>
                     </section>

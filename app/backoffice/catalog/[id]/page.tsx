@@ -339,7 +339,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         payload.append("is_visible", isVisible ? "true" : "false");
 
         // Design Attributes - Sanitize empty fields
-        ["material", "sleeve", "length", "neck_line", "fit"].forEach(field => {
+        ["material", "sleeve", "length", "neck_line", "fit", "processing_days_min", "processing_days_max"].forEach(field => {
             const val = (raw.get(field) as string)?.trim();
             if (val && val !== "") payload.append(field, val);
         });
@@ -473,7 +473,35 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
                         </div>
                     </section>
 
-                    {/* Variants Matrix */}
+                    {/* Logistics */}
+                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
+                        <div className="border-b border-slate-100 pb-4">
+                            <h2 className="text-lg font-black text-slate-900">Logistics</h2>
+                            <p className="text-xs text-slate-400 font-medium mt-1">Configure preparation time for delivery estimations.</p>
+                        </div>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <div className="space-y-2 relative">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Min Processing Days</label>
+                                <input
+                                    type="number"
+                                    name="processing_days_min"
+                                    defaultValue={(product as any).processing_days_min}
+                                    placeholder="e.g. 1"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                                />
+                            </div>
+                            <div className="space-y-2 relative">
+                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Max Processing Days</label>
+                                <input
+                                    type="number"
+                                    name="processing_days_max"
+                                    defaultValue={(product as any).processing_days_max}
+                                    placeholder="e.g. 2"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                                />
+                            </div>
+                        </div>
+                    </section>
                     <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                             <div>

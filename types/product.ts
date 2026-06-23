@@ -52,6 +52,8 @@ export interface ProductSummary {
   length?: string;
   neck_line?: string;
   fit?: string;
+  processing_days_min?: number;
+  processing_days_max?: number;
   variants?: ProductVariant[];
   media?: ProductMedia[];
 }
