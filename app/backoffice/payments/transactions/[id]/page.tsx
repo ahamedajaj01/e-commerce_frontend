@@ -74,7 +74,7 @@ export default function TransactionDetailPage() {
         if (!token || !id || !tx) return;
         setIsVerifying(true);
         try {
-            await verifyTransaction(id as string, { status, notes }, token);
+            await verifyTransaction(id as string, { status, notes } as any, token);
             await loadData();
             setNotes("");
         } catch (err: any) {
