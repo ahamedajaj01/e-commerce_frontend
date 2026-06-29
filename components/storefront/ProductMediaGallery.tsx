@@ -12,7 +12,7 @@ interface ProductMediaGalleryProps {
 
 export function ProductMediaGallery({ media, productName, onMediaSelect }: ProductMediaGalleryProps) {
     const [activeImage, setActiveImage] = useState(
-        media.length > 0 ? (media[0].file_url || getMediaUrl(media[0].file)) : null
+        media.length > 0 ? (media[0].file_url || getMediaUrl(media[0].file) || null) : null
     );
 
     const handleSelect = (url: string, id: string) => {
@@ -34,12 +34,12 @@ export function ProductMediaGallery({ media, productName, onMediaSelect }: Produ
             {media.length > 1 && (
                 <div className="flex md:flex-col gap-3 overflow-x-auto no-scrollbar md:w-20 lg:w-24 shrink-0">
                     {media.map((item) => {
-                        const url = item.file_url || getMediaUrl(item.file);
+                        const url = (item.file_url || getMediaUrl(item.file)) ?? "";
                         const isActive = activeImage === url;
                         return (
                             <button
-                                key={item.id}
-                                onClick={() => handleSelect(url, item.id!)}
+                                key={item.id ?? url}
+                                onClick={() => item.id && handleSelect(url, item.id)}
                                 className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-300 shrink-0 h-16 w-16 md:h-20 md:w-auto lg:h-24
                   ${isActive ? "border-slate-900 opacity-100 scale-95" : "border-transparent opacity-60 hover:opacity-100"}
                 `}
