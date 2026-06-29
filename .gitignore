@@ -31,15 +31,12 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env.local
-.env.*
 !.env.example
 
 # vercel
 .vercel
 
 # editor and OS files
-.vscode/
 .idea/
 .DS_Store
 
