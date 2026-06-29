@@ -1,16 +1,22 @@
 import { apiClient } from "./client";
 
 export interface DashboardStats {
-    active_orders: number;
-    low_stock_count: number;
-    monthly_revenue: string;
-    active_campaigns: number;
+    total_revenue: number;
+    total_orders: number;
+    pending_orders: number;
+    shipped_orders: number;
+    processing_orders: number;
+    today_orders: number;
+    currency: string;
     recent_transactions: {
-        id: string;
-        customer: string;
-        amount: string;
-        status: string;
-        timestamp: string;
+        transaction_id: string;
+        customer_identity: string;
+        items: number;
+        verification: string;
+        lifecycle: string;
+        progress: number;
+        settlement: number;
+        created_at: string;
     }[];
 }
 
@@ -21,10 +27,13 @@ export async function fetchDashboardStats(token?: string): Promise<DashboardStat
         if (err.status === 404) {
             console.warn("Analytics endpoint not found. Backend might not have analytics implemented yet.");
             return {
-                active_orders: 0,
-                low_stock_count: 0,
-                monthly_revenue: "NPR 0",
-                active_campaigns: 0,
+                total_revenue: 0,
+                total_orders: 0,
+                pending_orders: 0,
+                shipped_orders: 0,
+                processing_orders: 0,
+                today_orders: 0,
+                currency: "NPR",
                 recent_transactions: []
             };
         }

@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api/client";
+import { getMediaUrl } from "@/lib/utils";
 
 export interface InventoryItem {
     id: string;
@@ -37,10 +38,9 @@ export async function fetchInventory(token?: string, type?: "VIDEO_PRODUCT" | "C
     const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1\/?$/, "");
 
     const mappedItems = items.map((item: any) => {
-        let img = item.variant?.product_image || null;
-        if (img && (img.startsWith("/media/") || img.startsWith("/assets/"))) {
-            img = `${API_BASE}${img}`;
-        }
+        // Backend returns image under item.variant.image_url
+        const variantImage = item.variant?.image_url || item.variant?.image || item.variant?.product_image || null;
+        const img = variantImage ? getMediaUrl(variantImage) : null;
 
         const pType = item.variant?.product_type?.toUpperCase() || "";
         const isVideo = pType.includes("VIDEO") || pType.includes("DISCOVERY") || pType.includes("BROADCAST");

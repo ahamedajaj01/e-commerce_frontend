@@ -7,8 +7,10 @@ export interface CartItem {
   variant: ProductVariant;
   /** Flat product name string (from the updated API response) */
   product_name: string;
-  /** Thumbnail URL for the cart item image */
-  thumbnail: string;
+  /** Image URL for the cart item — the gallery image selected at add-to-cart time */
+  selected_image_url: string;
+  /** @deprecated use selected_image_url */
+  thumbnail?: string;
   /** Defensive fields to support product page linking if API provides them */
   product_slug?: string;
   product_id?: string;

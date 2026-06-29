@@ -1,24 +1,37 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { fetchProductDetail } from "@/lib/api/catalog";
 import { ResponsiveContainer } from "@/components/shared/ResponsiveContainer";
 import { AddToCartButton } from "@/components/storefront/AddToCartButton";
 import { ProductMediaGallery } from "@/components/storefront/ProductMediaGallery";
-import { notFound } from "next/navigation";
 
-interface Props {
-  params: Promise<{ id: string }>;
-}
+export default function ProductDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
 
-export default async function ProductDetailPage({ params }: Props) {
-  const { id } = await params;
-  let product;
-  try {
-    product = await fetchProductDetail(id);
-  } catch (e) {
-    product = null;
-  }
+  const [product, setProduct] = useState<any>(null);
+  const [selectedMediaId, setSelectedMediaId] = useState<string>("");
+
+  useEffect(() => {
+    fetchProductDetail(id)
+      .then((p) => {
+        setProduct(p);
+        // Pre-select first media item
+        if (p?.media && p.media.length > 0) {
+          setSelectedMediaId(p.media[0].id ?? "");
+        }
+      })
+      .catch(() => setProduct(null));
+  }, [id]);
 
   if (!product) {
-    notFound();
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
+      </div>
+    );
   }
 
   // Helper to render design attributes in a clean inline list
@@ -37,7 +50,11 @@ export default async function ProductDetailPage({ params }: Props) {
 
           {/* LEFT: Media Gallery (5/12 columns) */}
           <div className="lg:col-span-6 xl:col-span-7">
-            <ProductMediaGallery media={product.media || []} productName={product.name} />
+            <ProductMediaGallery
+              media={product.media || []}
+              productName={product.name}
+              onMediaSelect={(mediaId) => setSelectedMediaId(mediaId)}
+            />
           </div>
 
           {/* RIGHT: Product Information (7/12 columns) */}
@@ -64,18 +81,10 @@ export default async function ProductDetailPage({ params }: Props) {
 
                 <div className="space-y-4">
                   <p className="text-sm font-bold text-slate-400">
-                    Size: {product.variants?.map(v => v.size).filter((v, i, a) => a.indexOf(v) === i).join(", ")}
+                    Size: {product.variants?.map((v: any) => v.size).filter((v: any, i: number, a: any[]) => a.indexOf(v) === i).join(", ")}
                   </p>
 
-                  {/* Stock Badge - Green Pill with Check */}
-                  <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600">
-                    <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-sm">
-                      <span className="text-[10px] font-black">✓</span>
-                    </div>
-                    <span className="text-xs font-black uppercase tracking-widest leading-none">
-                      {product.variants?.reduce((acc, v) => acc + (v.stock_quantity || 0), 0)} in stock
-                    </span>
-                  </div>
+
 
                   {/* Delivery Signal: Processing Time */}
                   <div className="flex items-center gap-2 pt-1">
@@ -91,9 +100,12 @@ export default async function ProductDetailPage({ params }: Props) {
 
               <div className="h-px w-full bg-slate-100" />
 
-              {/* Purchase Section in Middle (Includes Color Bubbles, Size Bubbles, Qty, Bag/Buy Now) */}
+              {/* Purchase Section */}
               <div className="pt-2">
-                <AddToCartButton variants={product.variants || []} />
+                <AddToCartButton
+                  variants={product.variants || []}
+                  selectedMediaId={selectedMediaId}
+                />
               </div>
 
               {/* Detailed Highlights Section at the Last */}
@@ -145,4 +157,3 @@ export default async function ProductDetailPage({ params }: Props) {
     </div>
   );
 }
-

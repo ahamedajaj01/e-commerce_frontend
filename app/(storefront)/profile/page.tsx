@@ -48,7 +48,10 @@ export default function ProfilePage() {
 
                 {/* Navigation Options */}
                 <div className="grid gap-3">
-                    <button className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 text-left transition hover:border-slate-200 hover:bg-slate-50">
+                    <button
+                        onClick={() => router.push("/account/orders")}
+                        className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-white p-5 text-left transition hover:border-slate-200 hover:bg-slate-50"
+                    >
                         <div className="flex items-center gap-4">
                             <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
                                 <Package className="h-5 w-5" />

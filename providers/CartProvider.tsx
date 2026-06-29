@@ -16,10 +16,11 @@ interface CartContextValue {
   isCartOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (variantId: string, qty?: number) => Promise<void>;
+  addItem: (variantId: string, qty?: number, mediaId?: string) => Promise<void>;
   updateQty: (itemId: string, qty: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   refresh: () => Promise<void>;
+  clearCart: () => void;
 }
 
 const defaultValue: CartContextValue = {
@@ -36,6 +37,7 @@ const defaultValue: CartContextValue = {
   updateQty: async () => { },
   removeItem: async () => { },
   refresh: async () => { },
+  clearCart: () => { },
 };
 
 export const CartContext = createContext<CartContextValue>(defaultValue);
@@ -88,7 +90,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
    * Uses optimistic update: immediately adds the item to local state,
    * then reverts if the server rejects with INSUFFICIENT_STOCK or VARIANT_NOT_AVAILABLE.
    */
-  const addItem = useCallback(async (variantId: string, qty = 1) => {
+  const addItem = useCallback(async (variantId: string, qty = 1, mediaId?: string) => {
     const previous = cartRef.current;
 
     // Optimistic: bump totalItems for badge responsiveness
@@ -97,7 +99,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return { ...prev, total_quantity: prev.total_quantity + qty };
     });
     try {
-      await addToCart(variantId, qty, token ?? undefined);
+      await addToCart(variantId, qty, token ?? undefined, mediaId);
       await refresh();
       // Auto-open drawer on desktop when item is added
       openCart();
@@ -182,6 +184,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
+  const clearCart = useCallback(() => {
+    setCart(null);
+  }, []);
+
   const items = useMemo(() => cart?.items ?? [], [cart]);
   const totalItems = useMemo(() => cart?.total_quantity ?? 0, [cart]);
   const totalPrice = useMemo(() => cart?.total_price ?? "0.00", [cart]);
@@ -198,10 +204,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     updateQty,
     removeItem,
     refresh,
+    clearCart,
     isCartOpen,
     openCart,
     closeCart,
-  }), [cart, items, totalItems, totalPrice, isGuest, isLoading, addItem, updateQty, removeItem, refresh, isCartOpen, openCart, closeCart]);
+  }), [cart, items, totalItems, totalPrice, isGuest, isLoading, addItem, updateQty, removeItem, refresh, clearCart, isCartOpen, openCart, closeCart]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

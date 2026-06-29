@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
@@ -9,35 +9,61 @@ import { adjustInventory } from "@/lib/api/inventory";
 import { getProductImage, getMediaUrl } from "@/lib/utils";
 import type { Category, Product, ProductVariant, Brand } from "@/types/product";
 import { AlertBanner } from "@/components/ui/AlertBanner";
-import { Copy, Plus, X, Trash2 } from "lucide-react";
-
-// ─── Predefined option lists ─────────────────────────────────────────────────
-// No hardcoded options for maximum flexibility (Clothes, Jewelry, etc.)
+import { Copy, Plus, X, Trash2, ChevronLeft, Save, Loader2, Image as ImageIcon, Box, Tag, Truck, ShieldCheck, LayoutGrid, Info } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface VariantRow {
     id: string;
     backendId?: string;
     sku: string;
-    label: string; // was size
-    variation: string; // was color
+    label: string; // size
+    variation: string; // name
     price: string;
     stock_quantity: string;
     is_unlimited_stock: boolean;
+    image_id?: string;
 }
 
-// ─── Direct Input Field ─────────────────────────────────────────────────────
-function TextInput({ name, label, placeholder, defaultValue }: {
-    name: string; label: string; placeholder?: string; defaultValue?: string;
+// ─── Compact Input Components ───────────────────────────────────────────────
+function Section({ title, description, children, icon: Icon, actions }: { title: string; description?: string; children: React.ReactNode; icon?: any; actions?: React.ReactNode }) {
+    return (
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] overflow-hidden transition-all duration-300">
+            <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                <div className="flex items-center gap-4">
+                    {Icon && (
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm text-slate-600">
+                            <Icon className="w-5 h-5" />
+                        </div>
+                    )}
+                    <div>
+                        <h2 className="text-sm font-black text-slate-900 leading-tight uppercase tracking-tight">{title}</h2>
+                        {description && <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">{description}</p>}
+                    </div>
+                </div>
+                {actions && <div className="flex items-center gap-2">{actions}</div>}
+            </div>
+            <div className="p-8">
+                {children}
+            </div>
+        </section>
+    );
+}
+
+function TextInput({ name, label, placeholder, defaultValue, type = "text", required = false, value, onChange }: {
+    name: string; label: string; placeholder?: string; defaultValue?: any; type?: string; required?: boolean; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
     return (
-        <div className="space-y-2 relative">
-            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">{label}</label>
+        <div className="group space-y-2">
+            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1 group-focus-within:text-blue-600 transition-colors">{label}</label>
             <input
                 name={name}
+                type={type}
+                required={required}
                 defaultValue={defaultValue}
-                placeholder={placeholder || `Enter ${label.toLowerCase()}...`}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 h-12 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm group-hover:border-slate-300"
             />
         </div>
     );
@@ -52,35 +78,29 @@ function BulkAddTool({ onGenerate }: { onGenerate: (variation: string, scales: s
         const scales = scalesString.split(",").map(s => s.trim()).filter(s => s !== "");
         if (!variation || scales.length === 0) return;
         onGenerate(variation, scales);
-        // Reset for next use
         setVariation("");
         setScalesString("");
     };
 
     return (
-        <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 mb-6 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">Quick Bulk Entry</h3>
-                <span className="text-[9px] font-bold text-fuchsia-500 bg-fuchsia-50 px-2 py-1 rounded-md">BULK MODE</span>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-12 items-end">
-                <div className="sm:col-span-4 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Base Variation</label>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-5 mb-4">
+            <div className="grid gap-4 sm:grid-cols-12 items-end">
+                <div className="sm:col-span-4 space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Base Variation</label>
                     <input
                         value={variation}
                         onChange={(e) => setVariation(e.target.value)}
                         placeholder="e.g. Gold Plated"
-                        className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition h-[52px]"
+                        className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 h-9"
                     />
                 </div>
-                <div className="sm:col-span-5 space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest px-1">Scale Options (Comma Separated)</label>
+                <div className="sm:col-span-5 space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Scales (S, M, L)</label>
                     <input
                         value={scalesString}
                         onChange={(e) => setScalesString(e.target.value)}
-                        placeholder="e.g. 7, 8, 9 or S, M, L"
-                        className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-950 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition h-[52px]"
+                        placeholder="e.g. S, M, L"
+                        className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500 h-9"
                     />
                 </div>
                 <div className="sm:col-span-3">
@@ -88,80 +108,79 @@ function BulkAddTool({ onGenerate }: { onGenerate: (variation: string, scales: s
                         type="button"
                         onClick={handleAdd}
                         disabled={!variation || !scalesString}
-                        className="w-full h-[52px] bg-fuchsia-100/50 hover:bg-fuchsia-100 text-fuchsia-700 font-bold px-6 rounded-2xl text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-30 disabled:cursor-not-allowed border border-fuchsia-200/50 underline underline-offset-4 decoration-2"
+                        className="w-full h-9 bg-slate-900 text-white font-bold rounded-md text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 hover:bg-slate-800"
                     >
-                        Generate & Embed
+                        Bulk Generate
                     </button>
                 </div>
             </div>
         </div>
     );
 }
-function VariantRowItem({ row, index, onUpdate, onRemove, onDuplicate }: {
-    row: VariantRow; index: number;
-    onUpdate: (id: string, field: keyof VariantRow, value: string | boolean) => void;
-    onRemove: (id: string) => void;
-    onDuplicate: (id: string) => void;
-}) {
+
+function ImagePicker({ selectedMediaId, mediaItems, onChange }: { selectedMediaId: string; mediaItems: any[]; onChange: (id: string) => void; }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const selectedMedia = mediaItems.find(m => m.id === selectedMediaId);
+
     return (
-        <div className="grid grid-cols-12 gap-3 items-start p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-fuchsia-100 transition-colors">
-            <div className="col-span-12 sm:col-span-1 flex items-center">
-                <span className="h-7 w-7 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">{index + 1}</span>
-            </div>
-            <div className="col-span-12 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">SKU</label>
-                <input value={row.sku} onChange={(e) => onUpdate(row.id, "sku", e.target.value)} placeholder="e.g. SILK-RED-L"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
-            </div>
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Label / Size</label>
-                <input type="text" value={row.label} onChange={(e) => onUpdate(row.id, "label", e.target.value)} placeholder="e.g. XL"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
-            </div>
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Variation</label>
-                <input type="text" value={row.variation} onChange={(e) => onUpdate(row.id, "variation", e.target.value)} placeholder="e.g. Ruby Red"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
-            </div>
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Price (NPR)</label>
-                <input type="number" min="0" value={row.price} onChange={(e) => onUpdate(row.id, "price", e.target.value)} placeholder="2500"
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
-            </div>
-            <div className="col-span-6 sm:col-span-2">
-                <label className="text-[9px] uppercase tracking-widest font-black text-slate-400 block mb-1">Stock Qty</label>
-                {row.is_unlimited_stock ? (
-                    <div className="flex items-center h-9 px-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Unlimited</span>
-                    </div>
+        <div className="relative group/picker" ref={containerRef}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className="h-10 w-10 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center cursor-pointer hover:border-blue-500 transition-all shadow-inner relative"
+            >
+                {selectedMedia ? (
+                    <img src={getMediaUrl(selectedMedia.file_url || selectedMedia.file)} className="h-full w-full object-cover" />
                 ) : (
-                    <input type="number" min="0" value={row.stock_quantity} onChange={(e) => onUpdate(row.id, "stock_quantity", e.target.value)} placeholder="50"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10" />
+                    <ImageIcon className="w-4 h-4 text-slate-300" />
                 )}
+                <div className="absolute inset-0 bg-black/5 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="bg-white/90 p-1 rounded-md shadow-sm">
+                        <Plus className="w-3 h-3 text-slate-600" />
+                    </div>
+                </div>
             </div>
-            <div className="col-span-12 sm:col-span-1 flex flex-col items-end gap-2 pt-1 border-l border-slate-200 pl-2">
-                <button
-                    type="button"
-                    title="Duplicate this row"
-                    onClick={() => onDuplicate(row.id)}
-                    className="h-7 w-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all">
-                    <Copy className="w-3 h-3" />
-                </button>
-                <button
-                    type="button"
-                    title={row.is_unlimited_stock ? "Switch to fixed stock" : "Set as unlimited"}
-                    onClick={() => onUpdate(row.id, "is_unlimited_stock", !row.is_unlimited_stock)}
-                    className={`h-7 w-7 rounded-full flex items-center justify-center border text-[9px] font-black transition-all ${row.is_unlimited_stock
-                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md font-sans"
-                        : "bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-500"
-                        }`}>
-                    ∞
-                </button>
-                <button type="button" onClick={() => onRemove(row.id)}
-                    className="h-7 w-7 rounded-full flex items-center justify-center border border-slate-200 text-slate-300 hover:border-rose-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
-                    <Trash2 className="w-3 h-3" />
-                </button>
-            </div>
+
+            {isOpen && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="absolute bottom-full left-0 mb-3 p-5 bg-white border border-slate-200 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] z-50 grid grid-cols-4 gap-3 min-w-[320px] animate-in fade-in slide-in-from-bottom-2 origin-bottom duration-200">
+                        <div className="col-span-4 flex items-center justify-between mb-1 pb-2 border-b border-slate-50">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Link Variant Media</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.1em]">{mediaItems.length} Assets Available</span>
+                            </div>
+                            <button onClick={() => setIsOpen(false)} className="w-6 h-6 rounded-lg hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Remove Selection Option */}
+                        <div
+                            onClick={() => { onChange(""); setIsOpen(false); }}
+                            className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-100 bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:border-rose-300 hover:bg-rose-50 transition-all group"
+                        >
+                            <Trash2 className="w-4 h-4 text-slate-300 group-hover:text-rose-500" />
+                        </div>
+
+                        {mediaItems.length === 0 && (
+                            <div className="col-span-3 flex items-center justify-center h-16 text-[9px] font-bold text-slate-300 uppercase italic">
+                                No media uploaded
+                            </div>
+                        )}
+
+                        {mediaItems.map(m => (
+                            <div
+                                key={m.id}
+                                onClick={() => { onChange(m.id); setIsOpen(false); }}
+                                className={`h-16 w-16 rounded-xl border-2 overflow-hidden cursor-pointer transition-all ${selectedMediaId === m.id ? 'border-blue-600 ring-4 ring-blue-600/10' : 'border-slate-50 hover:border-blue-400'}`}
+                            >
+                                <img src={getMediaUrl(m.file_url || m.file)} className="h-full w-full object-cover" />
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -182,11 +201,26 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
     const [successInfo, setSuccessInfo] = useState<string | null>(null);
+    const [slug, setSlug] = useState("");
     const galleryInputRef = useRef<HTMLInputElement>(null);
-    // Track original stock per backendId so we can compute correct delta on save
     const originalStockRef = useRef<Record<string, number>>({});
 
     const { token } = useAuth();
+
+    const generateSlug = (text: string) => {
+        return text
+            .toString()
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/[^\w-]+/g, '')
+            .replace(/--+/g, '-');
+    };
+
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setSlug(generateSlug(val));
+    };
 
     useEffect(() => {
         if (!token) return;
@@ -201,28 +235,23 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             const found = allProducts.find(p => p.id === id) || null;
             if (found) {
                 setProduct(found);
-
-                // Initialize main image
+                setSlug(found.slug || "");
                 setMainImage(getProductImage(found) || null);
-
-                // Initialize existing gallery previews (all media objects excluding the first one used as main)
                 if (found.media && found.media.length > 1) {
                     setGalleryPreviews(found.media.slice(1).map(m => m.file_url || getMediaUrl(m.file) || ""));
                 }
-
-                // Pre-populate variants from existing product data
-                if (found.variants && found.variants.length > 0) {
+                if (found.variants) {
                     const variantRows = found.variants.map((v: ProductVariant) => ({
                         id: crypto.randomUUID(),
                         backendId: v.id,
                         sku: v.sku || "",
                         label: v.size || "",
-                        variation: v.color || "",
+                        variation: (v as any).name || (v as any).color || "",
                         price: v.price?.toString() || "",
                         stock_quantity: v.stock_quantity?.toString() || "0",
                         is_unlimited_stock: v.is_unlimited_stock || false,
+                        image_id: (v as any).image_id || (typeof (v as any).image === 'object' ? (v as any).image?.id : (v as any).image) || undefined,
                     }));
-                    // Store original stock quantities for delta calculation on save
                     const origStock: Record<string, number> = {};
                     found.variants.forEach((v: ProductVariant) => {
                         if (v.id) origStock[v.id] = v.stock_quantity ?? 0;
@@ -245,37 +274,22 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         }]);
     };
 
-    const generateSmartSKU = (name: string, label: string, variation: string) => {
-        const clean = (str: string) => str.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-        const p = clean(name || "PROD");
-        const v = clean(variation || "");
-        const l = clean(label || "");
-
-        let sku = p;
-        if (v) sku += `-${v}`;
-        if (l) sku += `-${l}`;
-        return sku;
+    const updateVariant = (id: string, field: keyof VariantRow, value: string | boolean) => {
+        setVariants((prev) => prev.map((v) => (v.id === id ? { ...v, [field]: value } : v)));
     };
 
-    const updateVariant = (id: string, field: keyof VariantRow, value: string | boolean) => {
-        setVariants((prev) => prev.map((v) => {
-            if (v.id === id) {
-                const updated = { ...v, [field]: value };
-                // Smart SKU suggestion: If SKU is empty and we just updated label/variation/name
-                if (!updated.sku && (field === "label" || field === "variation")) {
-                    const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
-                    updated.sku = generateSmartSKU(productName, updated.label, updated.variation);
-                }
-                return updated;
-            }
-            return v;
-        }));
+    const duplicateVariant = (id: string) => {
+        const source = variants.find(v => v.id === id);
+        if (!source) return;
+        setVariants((prev) => [...prev, { ...source, id: crypto.randomUUID(), backendId: undefined, sku: "" }]);
+    };
+
+    const removeVariant = (id: string) => {
+        setVariants((prev) => prev.filter((v) => v.id !== id));
     };
 
     const bulkAddVariants = (variation: string, selectedScales: string[]) => {
-        const productName = (document.getElementsByName("name")[0] as HTMLInputElement)?.value || "";
         const basePrice = (document.getElementsByName("base_price")[0] as HTMLInputElement)?.value || "";
-
         const newRows = selectedScales.map(scale => ({
             id: crypto.randomUUID(),
             variation: variation,
@@ -283,77 +297,39 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             price: basePrice,
             stock_quantity: "0",
             is_unlimited_stock: false,
-            sku: generateSmartSKU(productName, scale, variation)
+            sku: ""
         }));
-
         setVariants(prev => [...prev, ...newRows]);
-    };
-
-    const duplicateVariant = (id: string) => {
-        const source = variants.find(v => v.id === id);
-        if (!source) return;
-
-        setVariants((prev) => [
-            ...prev,
-            {
-                ...source,
-                id: crypto.randomUUID(),
-                backendId: undefined, // Must be new for DB
-                label: "", // Clear so user can enter new one
-                sku: ""   // Clear SKU to avoid duplicate SKU errors
-            },
-        ]);
-    };
-
-    const removeVariant = (id: string) => {
-        setVariants((prev) => prev.filter((v) => v.id !== id));
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!token || !product) return;
         setLoading(true);
-
         const raw = new FormData(e.currentTarget);
         const payload = new FormData();
 
-        // Basic Metadata
-        const name = (raw.get("name") as string)?.trim();
-        const description = (raw.get("description") as string)?.trim();
-        const base_price = (raw.get("base_price") as string)?.trim();
-        const category_id = raw.get("category_id") as string;
-        const brand_id = raw.get("brand_id") as string;
-        const isVisible = raw.get("is_visible") === "true";
+        ["name", "slug", "description", "base_price", "category_id", "brand_id"].forEach(f => {
+            const val = raw.get(f) as string;
+            if (val) payload.append(f, val);
+        });
+        payload.append("is_visible", raw.get("is_visible") === "true" ? "true" : "false");
 
-        if (name) payload.append("name", name);
-        if (description) payload.append("description", description);
-        if (base_price) payload.append("base_price", base_price);
-
-        // CRITICAL: Only append if not empty to prevent backend 500 errors
-        if (category_id && category_id !== "") {
-            payload.append("category_id", category_id);
-        }
-        if (brand_id && brand_id !== "") {
-            payload.append("brand_id", brand_id);
-        }
-        payload.append("is_visible", isVisible ? "true" : "false");
-
-        // Design Attributes - Sanitize empty fields
         ["material", "sleeve", "length", "neck_line", "fit", "processing_days_min", "processing_days_max"].forEach(field => {
             const val = (raw.get(field) as string)?.trim();
-            if (val && val !== "") payload.append(field, val);
+            if (val) payload.append(field, val);
         });
 
-        // Media
         if (imageFile) payload.append("image", imageFile);
         galleryFiles.forEach(file => payload.append("images", file));
 
-        // Variants - ALWAYS send, even if empty, to ensure deletions sync to backend
-        const variantPayload = variants.map(({ id: _id, backendId, label, variation, ...v }) => ({
+        const variantPayload = variants.map(({ id: _id, backendId, label, variation, image_id, ...v }) => ({
             ...(backendId ? { id: backendId } : {}),
             sku: v.sku,
             size: label || "",
-            color: variation || "",
+            name: variation || "",
+            image_id: image_id || null,
+            image: image_id || null, // Add 'image' as fallback mapping if the backend expects it
             price: Number(v.price || 0),
             stock_quantity: Number(v.stock_quantity || 0),
             is_unlimited_stock: v.is_unlimited_stock,
@@ -361,324 +337,298 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
         payload.append("variants", JSON.stringify(variantPayload));
 
         try {
-            // Step 1: Meta sync
             await updateProduct(product.id, payload, token);
-
-            // Step 2: Stock sync (Delta)
             const stockSyncPromises = variants
                 .filter(v => v.backendId && !v.is_unlimited_stock && v.stock_quantity !== "")
                 .flatMap(v => {
-                    const newQty = Number(v.stock_quantity || 0);
-                    const originalQty = originalStockRef.current[v.backendId!] ?? 0;
-                    const delta = newQty - originalQty;
-
+                    const delta = Number(v.stock_quantity || 0) - (originalStockRef.current[v.backendId!] ?? 0);
                     if (delta === 0) return [];
-                    const movementType = delta > 0 ? "IN" : "OUT";
-                    const absDelta = Math.abs(delta);
-
-                    return [
-                        adjustInventory(v.backendId!, absDelta, movementType, "Editor Adjustment", token)
-                    ];
+                    return [adjustInventory(v.backendId!, Math.abs(delta), delta > 0 ? "IN" : "OUT", "Backup Adjust", token)];
                 });
-
             await Promise.all(stockSyncPromises);
-            setSuccessInfo("Product details synchronized successfully!");
+            setSuccessInfo("Catalog synchronized successfully!");
             setTimeout(() => router.push("/backoffice/catalog"), 1000);
-        } catch (err: any) {
-            console.error("Save failed:", err);
-            setErrorInfo("Server error. Please ensure all required fields are filled correctly.");
+        } catch (err) {
+            setErrorInfo("Failed to synchronize catalog item.");
         } finally {
             setLoading(false);
         }
     };
 
-    if (fetching) {
+    if (fetching) return <div className="flex h-screen items-center justify-center bg-slate-50"><Loader2 className="w-8 h-8 animate-spin text-slate-200" /></div>;
+
+    if (!product) {
         return (
-            <div className="flex h-64 items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-fuchsia-500 border-t-transparent" />
+            <div className="flex h-screen items-center justify-center bg-slate-50 font-sans">
+                <div className="bg-white p-10 rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full text-center space-y-6">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-100">
+                        <X className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">Product Disappeared</h2>
+                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                            {errorInfo || "The catalog entry you're looking for doesn't exist or may have been removed."}
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => router.push("/backoffice/catalog")}
+                        className="w-full bg-slate-900 hover:bg-black text-white font-black h-12 uppercase tracking-widest text-[10px] rounded-xl transition-all active:scale-[0.98]"
+                    >
+                        Back to Inventory
+                    </Button>
+                </div>
             </div>
         );
     }
 
-    if (!product) {
-        return <div>Product not found.</div>;
-    }
-
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-            <AlertBanner message={errorInfo || ""} type="error" onClose={() => setErrorInfo(null)} />
-            <AlertBanner message={successInfo || ""} type="success" onClose={() => setSuccessInfo(null)} />
+        <div className="bg-[#f8fafc] min-h-screen">
+            <div className="max-w-[1280px] mx-auto px-6 py-8">
+                <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* ── Page Header ─────────────────────────────────────────────────── */}
-            <div className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50">
-                <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="text-[10px] uppercase tracking-widest font-black text-slate-400 hover:text-slate-900 transition flex items-center gap-2 mb-6"
-                >
-                    ← Back to Catalog
-                </button>
-                <p className="text-[10px] uppercase tracking-[0.4em] font-black text-fuchsia-600">Product Studio</p>
-                <h1 className="mt-2 text-4xl font-black text-slate-900 leading-tight">Edit Product</h1>
-                <p className="mt-3 text-sm font-medium text-slate-400 max-w-xl">
-                    Update the details below and hit <strong>Save Changes</strong> when ready.
-                </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-3">
-
-                {/* ── LEFT COLUMN ──────────────────────────────────────────────── */}
-                <div className="lg:col-span-2 space-y-8">
-
-                    {/* Essential Info */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Essential Information</h2>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">
-                                Product Name <span className="text-rose-500">*</span>
-                            </label>
-                            <input name="name" required type="text" defaultValue={product.name}
-                                placeholder="e.g. Silk Wrap Dress"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition" />
+                    {/* Header Bar */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-8 mb-8 bg-slate-50/30 -mx-10 px-10 pt-4">
+                        <div className="space-y-1">
+                            <button type="button" onClick={() => router.back()} className="text-[10px] font-black text-slate-400 hover:text-slate-900 transition-all flex items-center gap-2 uppercase tracking-widest mb-3 group">
+                                <div className="p-1 rounded bg-white shadow-sm border border-slate-200 group-hover:border-slate-300">
+                                    <ChevronLeft className="w-3 h-3" />
+                                </div>
+                                Catalog Archive
+                            </button>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
+                                {product.name}
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 text-[10px] font-black text-slate-500 rounded-lg uppercase tracking-widest shadow-sm self-center mt-1">
+                                    <span className="opacity-30">ID:</span> {product.id.slice(0, 8)}
+                                </div>
+                            </h1>
                         </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Slug</label>
-                            <input name="slug" type="text" defaultValue={product.slug}
-                                placeholder="silk-wrap-dress"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition" />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Description</label>
-                            <textarea name="description" rows={4} defaultValue={product.description}
-                                placeholder="Describe the garment — styling, occasion, fit notes..."
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition resize-none" />
-                        </div>
-                    </section>
-
-                    {/* Design Attributes */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <div className="border-b border-slate-100 pb-4">
-                            <h2 className="text-lg font-black text-slate-900">Design Attributes</h2>
-                            <p className="text-xs text-slate-400 font-medium mt-1">These power the storefront filters and reel-to-product linking.</p>
-                        </div>
-                        <div className="grid gap-5 sm:grid-cols-2">
-                            <TextInput name="material" label="Primary Material" placeholder="e.g. Gold Plated / Silk" defaultValue={(product as any).material} />
-                            <TextInput name="sleeve" label="Primary Detail / Type" placeholder="e.g. Stud / Sleeveless" defaultValue={(product as any).sleeve} />
-                            <TextInput name="length" label="Secondary Detail" placeholder="e.g. Dangle / Midi" defaultValue={(product as any).length} />
-                            <TextInput name="neck_line" label="Styling / Connection" placeholder="e.g. Hook / V-Neck" defaultValue={(product as any).neck_line} />
-                            <TextInput name="fit" label="Standard Fit / Style" placeholder="e.g. Adjustable / Regular" defaultValue={(product as any).fit} />
-                        </div>
-                    </section>
-
-                    {/* Logistics */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <div className="border-b border-slate-100 pb-4">
-                            <h2 className="text-lg font-black text-slate-900">Logistics</h2>
-                            <p className="text-xs text-slate-400 font-medium mt-1">Configure preparation time for delivery estimations.</p>
-                        </div>
-                        <div className="grid gap-5 sm:grid-cols-2">
-                            <div className="space-y-2 relative">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Min Processing Days</label>
-                                <input
-                                    type="number"
-                                    name="processing_days_min"
-                                    defaultValue={(product as any).processing_days_min}
-                                    placeholder="e.g. 1"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                                />
-                            </div>
-                            <div className="space-y-2 relative">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Max Processing Days</label>
-                                <input
-                                    type="number"
-                                    name="processing_days_max"
-                                    defaultValue={(product as any).processing_days_max}
-                                    placeholder="e.g. 2"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-900 font-medium placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition"
-                                />
-                            </div>
-                        </div>
-                    </section>
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                            <div>
-                                <h2 className="text-lg font-black text-slate-900">Inventory Matrix</h2>
-                                <p className="text-xs text-slate-400 font-medium mt-1">Define variations for this item (e.g. Gold Plated / Universal).</p>
-                            </div>
-                            <button type="button" onClick={addVariantRow}
-                                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-fuchsia-600 transition-colors">
-                                <span className="text-lg leading-none">+</span> Add Row
+                        <div className="flex items-center gap-4">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="bg-slate-900 hover:bg-black text-white px-8 h-12 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 shadow-[0_10px_20px_-5px_rgba(0,0,0,0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:shadow-none"
+                            >
+                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                {loading ? "Synchronizing..." : "Save Product Details"}
                             </button>
                         </div>
+                    </div>
 
-                        <BulkAddTool onGenerate={bulkAddVariants} />
+                    <div className="max-w-[1000px] mx-auto space-y-6">
+                        {/* Status Messages */}
+                        <AlertBanner message={errorInfo || ""} type="error" onClose={() => setErrorInfo(null)} className="rounded-md h-auto py-3 px-4 text-xs font-medium" />
+                        {successInfo && <AlertBanner message={successInfo} type="success" onClose={() => setSuccessInfo(null)} className="rounded-md h-auto py-3 px-4 text-xs font-medium" />}
 
-                        {variants.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200">
-                                <span className="text-3xl opacity-20 mb-3">📦</span>
-                                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No variants yet</p>
-                                <p className="text-xs text-slate-300 font-medium mt-1">Click "Add Row" to create your first size/color option.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {variants.map((v, i) => (
-                                    <VariantRowItem
-                                        key={v.id}
-                                        row={v}
-                                        index={i}
-                                        onUpdate={updateVariant}
-                                        onRemove={removeVariant}
-                                        onDuplicate={duplicateVariant}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-
-                    </section>
-
-                    {/* Visual Media */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Visual Media</h2>
-                        <div className="grid grid-cols-2 gap-6">
-                            <div
-                                onClick={() => document.getElementById("main-image-upload")?.click()}
-                                className="group relative aspect-[3/4] rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 hover:bg-slate-100 transition cursor-pointer overflow-hidden"
-                            >
-                                {mainImage ? (
-                                    <img src={mainImage} className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition duration-700" alt="Preview" />
-                                ) : (
-                                    <>
-                                        <span className="text-4xl opacity-20 group-hover:scale-125 transition duration-500">🖼️</span>
-                                        <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Main Image</p>
-                                        <p className="text-[9px] text-slate-300 font-medium">JPG, PNG, WEBP</p>
-                                    </>
-                                )}
-                                {mainImage && (
-                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                                        <p className="text-white text-[10px] font-black uppercase tracking-widest">Change Photo</p>
-                                    </div>
-                                )}
-                                <input id="main-image-upload" type="file" accept="image/*" className="hidden"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) { setImageFile(file); setMainImage(URL.createObjectURL(file)); }
-                                    }} />
-                            </div>
-
-                            {/* Gallery grid mapping */}
-                            {galleryPreviews.map((preview, idx) => (
-                                <div key={idx} className="group relative aspect-[3/4] rounded-3xl overflow-hidden border border-slate-100 bg-slate-50">
-                                    <img src={preview} className="h-full w-full object-cover" alt={`Gallery ${idx + 1}`} />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            // Handle local vs remote preview removal
-                                            setGalleryPreviews(prev => prev.filter((_, i) => i !== idx));
-                                            setGalleryFiles(prev => prev.filter((_, i) => i !== idx));
-                                        }}
-                                        className="absolute top-2 right-2 h-6 w-6 rounded-full bg-white/90 text-rose-500 font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm"
-                                    >
-                                        ✕
-                                    </button>
+                        {/* 1. PRODUCT MEDIA */}
+                        <Section title="Product Media" icon={ImageIcon} description="Visual Assets Workflow">
+                            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-4">
+                                <div
+                                    onClick={() => document.getElementById("main-image-upload")?.click()}
+                                    className="aspect-[3/4] rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-3 text-center cursor-pointer hover:bg-white hover:border-blue-500 transition-all group overflow-hidden relative shadow-sm"
+                                >
+                                    {mainImage ? (
+                                        <img src={mainImage} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-110" />
+                                    ) : (
+                                        <>
+                                            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-2 shadow-sm group-hover:text-blue-600 group-hover:border-blue-200 transition-all">
+                                                <Plus className="w-5 h-5" />
+                                            </div>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Master</span>
+                                        </>
+                                    )}
+                                    <input id="main-image-upload" type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setImageFile(f); setMainImage(URL.createObjectURL(f)); } }} />
                                 </div>
-                            ))}
 
-                            {/* Add More Photos */}
-                            <div
-                                onClick={() => galleryInputRef.current?.click()}
-                                className="aspect-[3/4] rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-4 opacity-70 hover:opacity-100 transition cursor-pointer"
-                            >
-                                <span className="text-2xl opacity-30">➕</span>
-                                <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">More Photos</p>
+                                {galleryPreviews.map((p, idx) => (
+                                    <div key={idx} className="aspect-[3/4] rounded-2xl overflow-hidden relative group border border-slate-200 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1">
+                                        <img src={p} className="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setGalleryPreviews(prev => prev.filter((_, i) => i !== idx)); setGalleryFiles(prev => prev.filter((_, i) => i !== idx)); }}
+                                            className="absolute top-2 right-2 bg-white text-slate-900 rounded-full h-6 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md border border-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <div
+                                    onClick={() => galleryInputRef.current?.click()}
+                                    className="aspect-[3/4] rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-white hover:border-slate-400 transition-all group shadow-inner"
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center text-slate-300 group-hover:text-slate-900 group-hover:bg-white transition-all shadow-sm">
+                                        <Plus className="w-6 h-6 font-black" />
+                                    </div>
+                                    <input ref={galleryInputRef} type="file" multiple accept="image/*" className="hidden" onChange={(e) => { const fs = Array.from(e.target.files || []); setGalleryFiles(prev => [...prev, ...fs]); setGalleryPreviews(prev => [...prev, ...fs.map(f => URL.createObjectURL(f))]); }} />
+                                </div>
                             </div>
-                            <input
-                                ref={galleryInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                className="hidden"
-                                onChange={(e) => {
-                                    if (!e.target.files) return;
-                                    const files = Array.from(e.target.files);
-                                    setGalleryFiles(prev => [...prev, ...files]);
-                                    setGalleryPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
-                                }}
-                            />
-                        </div>
-                    </section>
-                </div>
+                        </Section>
 
-                {/* ── RIGHT SIDEBAR ─────────────────────────────────────────────── */}
-                <div className="space-y-8">
-
-                    {/* Classification */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-6">
-                        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">Classification</h2>
-
-                        <div className="grid gap-6 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Category</label>
-                                <select name="category_id" defaultValue={product.category_detail?.id || product.category || ""}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition">
-                                    <option value="">Select Category</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
+                        {/* 2. BASIC PRODUCT INFORMATION */}
+                        {/* 2. ESSENTIAL INFORMATION */}
+                        <Section title="Essential Information" icon={Info} description="Primary commercial identity">
+                            <div className="space-y-6">
+                                <TextInput name="name" label="PRODUCT NAME *" defaultValue={product.name} required placeholder="e.g. Kurti" onChange={handleNameChange} />
+                                <TextInput name="slug" label="SLUG" placeholder="product-url-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+                                <div className="group space-y-2">
+                                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1 group-focus-within:text-blue-600 transition-colors">DESCRIPTION</label>
+                                    <textarea name="description" rows={5} defaultValue={product.description} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 border-neutral-200 transition-all shadow-sm resize-none group-hover:border-slate-300" placeholder="Describe the item..." />
+                                </div>
                             </div>
+                        </Section>
 
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">Brand</label>
-                                <select name="brand_id" defaultValue={(product as any).brand_detail?.id || product.brand || ""}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition">
-                                    <option value="">No Brand / Private Label</option>
-                                    {brands.map((brand) => (
-                                        <option key={brand.id} value={brand.id}>{brand.name}</option>
-                                    ))}
-                                </select>
+                        {/* 3. CLASSIFICATION */}
+                        <Section title="Classification" icon={LayoutGrid} description="Categorization & Pricing Registry">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
+                                <div className="group space-y-2">
+                                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1 group-focus-within:text-blue-600 transition-colors">CATEGORY</label>
+                                    <div className="relative">
+                                        <select name="category_id" defaultValue={product.category_detail?.id || product.category || ""} className="w-full bg-white border border-slate-200 rounded-xl px-4 h-12 text-sm font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm appearance-none cursor-pointer group-hover:border-slate-300">
+                                            <option value="">Select Category...</option>
+                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
+                                            <Tag className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="group space-y-2">
+                                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest px-1 group-focus-within:text-blue-600 transition-colors">BRAND</label>
+                                    <div className="relative">
+                                        <select name="brand_id" defaultValue={(product as any).brand_detail?.id || product.brand || ""} className="w-full bg-white border border-slate-200 rounded-xl px-4 h-12 text-sm font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm appearance-none cursor-pointer group-hover:border-slate-300">
+                                            <option value="">No Brand / Private Label</option>
+                                            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
+                                            <ShieldCheck className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <TextInput name="base_price" label="BASE PRICE (NPR) *" defaultValue={product.base_price || (product as any).price} required type="number" placeholder="0.00" />
+
+                                <div className="pt-4 border-t border-slate-100 md:col-span-2 flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-widest">STORE VISIBILITY</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter leading-none">Toggle to hide this from the main catalog</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer scale-110 origin-right">
+                                        <input type="checkbox" name="is_visible" defaultChecked={product.is_visible !== false} className="sr-only peer" value="true" />
+                                        <div className="w-12 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-6 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        </Section>
 
-                        <div className="space-y-2">
-                            <label className="text-[10px] uppercase tracking-widest font-black text-slate-500">
-                                Base Price (NPR) <span className="text-rose-500">*</span>
-                            </label>
-                            <input name="base_price" type="number" min="0" step="0.01"
-                                defaultValue={product.base_price || (product as any).price || ""}
-                                placeholder="e.g. 2500"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition" />
-                            <p className="text-[9px] text-slate-400 font-medium">Used as the display price. Individual variant prices override this.</p>
-                        </div>
+                        {/* 3. PRODUCT VARIANTS */}
+                        <Section
+                            title="Product Variants"
+                            icon={Box}
+                            description="Stock Management & Variation Registry"
+                            actions={
+                                <button type="button" onClick={addVariantRow} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95 shadow-slate-200">
+                                    <Plus className="w-3.5 h-3.5" /> New Variant
+                                </button>
+                            }
+                        >
+                            <BulkAddTool onGenerate={bulkAddVariants} />
 
-                        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Store Visibility</h3>
-                                <p className="text-[10px] text-slate-400 mt-0.5">Toggle to hide this from the main catalog.</p>
+                            <div className="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-visible">
+                                <table className="w-full text-[11px] border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-400 font-black uppercase tracking-widest">
+                                            <th className="px-5 py-4 text-left w-12 opacity-50">#</th>
+                                            <th className="px-4 py-4 text-left w-14 opacity-50">Slot</th>
+                                            <th className="px-4 py-4 text-left">SKU</th>
+                                            <th className="px-4 py-4 text-left w-20">LABEL / SIZE</th>
+                                            <th className="px-4 py-4 text-left">VARIATION</th>
+                                            <th className="px-4 py-4 text-left w-24">PRICE (NPR)</th>
+                                            <th className="px-4 py-4 text-left w-28">STOCK QTY</th>
+                                            <th className="px-5 py-4 text-right w-24 opacity-50">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {variants.map((v, i) => {
+                                            const media = (product.media || []).find(m => m.id === v.image_id);
+                                            return (
+                                                <tr key={v.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-5 py-4 text-slate-300 font-black">{i + 1}</td>
+                                                    <td className="px-4 py-4">
+                                                        <ImagePicker
+                                                            selectedMediaId={v.image_id || ""}
+                                                            mediaItems={product.media || []}
+                                                            onChange={id => updateVariant(v.id, "image_id", id)}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <input value={v.sku} onChange={e => updateVariant(v.id, "sku", e.target.value)} className="w-full bg-transparent border-none p-0 font-bold text-slate-900 focus:ring-0 placeholder:text-slate-200" placeholder="Variant SKU" />
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <input value={v.label} onChange={e => updateVariant(v.id, "label", e.target.value)} className="w-full bg-transparent border-none p-0 font-bold text-slate-900 focus:ring-0 placeholder:text-slate-200" placeholder="e.g. L" />
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <input value={v.variation} onChange={e => updateVariant(v.id, "variation", e.target.value)} className="w-full bg-transparent border-none p-0 font-bold text-slate-900 focus:ring-0 placeholder:text-slate-200" placeholder="e.g. Forest Green" />
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-slate-300 font-bold">Rs.</span>
+                                                            <input type="number" value={v.price} onChange={e => updateVariant(v.id, "price", e.target.value)} className="w-full bg-transparent border-none p-0 font-black text-slate-900 focus:ring-0" placeholder="0" />
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            {v.is_unlimited_stock ? (
+                                                                <div className="flex-1 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-black text-[9px] uppercase tracking-tighter">Unlimited</div>
+                                                            ) : (
+                                                                <input type="number" value={v.stock_quantity} onChange={e => updateVariant(v.id, "stock_quantity", e.target.value)} className="w-full bg-transparent border-none p-0 font-bold text-slate-900 focus:ring-0" placeholder="0" />
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => updateVariant(v.id, "is_unlimited_stock", !v.is_unlimited_stock)}
+                                                                className={`w-7 h-7 shrink-0 rounded-lg border flex items-center justify-center transition-all ${v.is_unlimited_stock ? 'bg-slate-900 border-slate-900 text-white' : 'text-slate-300 border-slate-200 hover:border-slate-400'}`}
+                                                            >
+                                                                <span className="text-xs font-black">∞</span>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-5 py-4 text-right">
+                                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button type="button" onClick={() => duplicateVariant(v.id)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors"><Copy className="w-4 h-4" /></button>
+                                                            <button type="button" onClick={() => removeVariant(v.id)} className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="is_visible" defaultChecked={product.is_visible !== false} className="sr-only peer" value="true" />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                            </label>
+                        </Section>
+
+                        {/* 4. TECHNICAL SPECS & OTHERS */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Section title="Design Attributes" icon={ShieldCheck} description="Storefront filters & linking">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                    <TextInput name="material" label="Primary Material" defaultValue={(product as any).material} />
+                                    <TextInput name="sleeve" label="Primary Detail / Type" defaultValue={(product as any).sleeve} />
+                                    <TextInput name="length" label="Secondary Detail" defaultValue={(product as any).length} />
+                                    <TextInput name="neck_line" label="Styling / Connection" defaultValue={(product as any).neck_line} />
+                                    <div className="col-span-2">
+                                        <TextInput name="fit" label="Standard Fit / Style" defaultValue={(product as any).fit} />
+                                    </div>
+                                </div>
+                            </Section>
+
+                            <Section title="Logistics" icon={Truck} description="Dispatch Timelines">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <TextInput type="number" name="processing_days_min" label="MIN PROCESSING DAYS" defaultValue={(product as any).processing_days_min} />
+                                    <TextInput type="number" name="processing_days_max" label="MAX PROCESSING DAYS" defaultValue={(product as any).processing_days_max} />
+                                </div>
+                            </Section>
                         </div>
-                    </section>
-
-
-
-                    {/* Publish */}
-                    <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-xl shadow-slate-200/50 space-y-5">
-                        <Button type="submit" disabled={loading} className="w-full py-6 text-[10px] uppercase tracking-widest font-black h-auto">
-                            {loading ? "Saving..." : "Save Changes →"}
-                        </Button>
-                        <p className="text-center text-[9px] text-slate-400 font-medium leading-relaxed">
-                            This will update the product globally across all storefronts.
-                        </p>
-                    </section>
-                </div>
-            </form>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }

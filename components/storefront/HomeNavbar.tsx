@@ -193,6 +193,9 @@ export function HomeNavbar() {
 
             {/* Permanent Anchor Links */}
             <Link href="/return-policy" className="font-bold text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">Returns</Link>
+            {!isAuthenticated && (
+              <Link href="/track-order" className="font-bold text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">Track Order</Link>
+            )}
             <Link href="/contact" className="font-bold text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">Support</Link>
           </div>
         </nav>
@@ -365,6 +368,9 @@ export function HomeNavbar() {
 
               {/* Permanent Mobile Bottom Links */}
               <Link href="/return-policy" onClick={() => setMobileOpen(false)} className="block py-3 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-fuchsia-600 transition">Return / Exchange</Link>
+              {!isAuthenticated && (
+                <Link href="/track-order" onClick={() => setMobileOpen(false)} className="block py-3 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-fuchsia-600 transition">Track Your Order</Link>
+              )}
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="block py-3 text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-fuchsia-600 transition">Contact Us</Link>
             </nav>
 

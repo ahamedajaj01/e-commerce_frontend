@@ -25,6 +25,7 @@ import {
   Bell,
   Terminal,
   Image as ImageIcon,
+  CreditCard,
 } from "lucide-react";
 
 import { fetchBackofficeNavigationItems } from "@/lib/api/cms";
@@ -54,6 +55,14 @@ const NAVIGATION_BASE: NavGroup[] = [
     title: "Fulfillment",
     items: [
       { label: "Shipping Rules", href: "/backoffice/shipping", icon: Truck },
+    ],
+  },
+  {
+    title: "Payment",
+    items: [
+      { label: "Transactions", href: "/backoffice/payments/transactions", icon: CreditCard },
+      { label: "Payment Methods", href: "/backoffice/payments/methods", icon: Shield },
+      { label: "Providers", href: "/backoffice/payments/providers", icon: Settings },
     ],
   },
   {

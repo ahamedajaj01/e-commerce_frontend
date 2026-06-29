@@ -96,11 +96,14 @@ export async function fetchCart(token?: string): Promise<Cart> {
 export async function addToCart(
   variantId: string,
   quantity: number,
-  token?: string
+  token?: string,
+  mediaId?: string
 ): Promise<Cart> {
+  const body: Record<string, any> = { variant_id: variantId, quantity };
+  if (mediaId) body.media_id = mediaId;
   return cartFetch<Cart>("/storefront/cart/items/", {
     method: "POST",
-    body: { variant_id: variantId, quantity },
+    body,
     token,
   });
 }

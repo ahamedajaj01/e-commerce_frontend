@@ -91,11 +91,13 @@ export async function toggleShippingRule(
  * Sends extracted address geodata and returns the matched shipping rule.
  */
 export async function calculateShipping(
-    data: ShippingCalculationRequest
+    data: ShippingCalculationRequest,
+    token?: string
 ): Promise<ShippingCalculationResult> {
     return apiClient<ShippingCalculationResult>("/storefront/shipping/calculate/", {
         method: "POST",
         body: data as any,
+        token,
         headers: buildGuestTokenHeaders(),
     });
 }

@@ -99,7 +99,7 @@ export default function CartPage() {
                   {/* Thumbnail */}
                   <div className="h-28 w-24 sm:h-36 sm:w-28 flex-shrink-0 overflow-hidden rounded-2xl bg-white border border-neutral-100 relative shadow-sm">
                     <img
-                      src={getMediaUrl(item.thumbnail)}
+                      src={getMediaUrl(item.selected_image_url)}
                       alt={item.product_name}
                       className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
@@ -152,9 +152,6 @@ export default function CartPage() {
 
                     {/* Variant Badges */}
                     <div className="flex gap-2 mt-4">
-                      <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-lg text-[9px] uppercase tracking-widest font-black text-neutral-400">
-                        Colors:<span className="text-neutral-600 ml-1">{item.variant.color}</span>
-                      </div>
                       <div className="px-3 py-1.5 bg-white border border-neutral-100 rounded-lg text-[9px] uppercase tracking-widest font-black text-neutral-400">
                         Size:<span className="text-neutral-800 font-bold ml-1">{item.variant.size}</span>
                       </div>

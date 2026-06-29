@@ -87,7 +87,7 @@ export function CartDrawer() {
                                 {/* Thumbnail */}
                                 <div className="h-24 w-20 flex-shrink-0 overflow-hidden rounded-2xl bg-white border border-neutral-100">
                                     <img
-                                        src={getMediaUrl(item.thumbnail)}
+                                        src={getMediaUrl(item.selected_image_url)}
                                         alt={item.product_name}
                                         className="h-full w-full object-cover"
                                     />
@@ -136,9 +136,6 @@ export function CartDrawer() {
 
                                     {/* Variant Badge Look */}
                                     <div className="flex gap-2 mt-3">
-                                        <div className="px-2 py-1 bg-white border border-neutral-100 rounded-md text-[8px] uppercase tracking-widest font-black text-neutral-400">
-                                            Colors:<span className="text-neutral-600">{item.variant.color}</span>
-                                        </div>
                                         <div className="px-2 py-1 bg-white border border-neutral-100 rounded-md text-[8px] uppercase tracking-widest font-black text-neutral-400">
                                             Size:<span className="text-neutral-600 font-bold">{item.variant.size}</span>
                                         </div>

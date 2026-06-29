@@ -7,12 +7,18 @@ import type { ProductMedia } from "@/types/product";
 interface ProductMediaGalleryProps {
     media: ProductMedia[];
     productName: string;
+    onMediaSelect?: (mediaId: string) => void;
 }
 
-export function ProductMediaGallery({ media, productName }: ProductMediaGalleryProps) {
+export function ProductMediaGallery({ media, productName, onMediaSelect }: ProductMediaGalleryProps) {
     const [activeImage, setActiveImage] = useState(
         media.length > 0 ? (media[0].file_url || getMediaUrl(media[0].file)) : null
     );
+
+    const handleSelect = (url: string, id: string) => {
+        setActiveImage(url);
+        onMediaSelect?.(id);
+    };
 
     if (!media.length) {
         return (
@@ -33,7 +39,7 @@ export function ProductMediaGallery({ media, productName }: ProductMediaGalleryP
                         return (
                             <button
                                 key={item.id}
-                                onClick={() => setActiveImage(url)}
+                                onClick={() => handleSelect(url, item.id!)}
                                 className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-300 shrink-0 h-16 w-16 md:h-20 md:w-auto lg:h-24
                   ${isActive ? "border-slate-900 opacity-100 scale-95" : "border-transparent opacity-60 hover:opacity-100"}
                 `}

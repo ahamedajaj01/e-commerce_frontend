@@ -12,39 +12,32 @@ export function getMediaUrl(value?: string | null): string | undefined {
     const trimmed = value.trim();
     if (!trimmed) return undefined;
 
-    // 1. If it's already an absolute URL (http, https, blob, or data), return as is
+    // 1. Already an absolute URL — return as-is
     if (/^(https?:|blob:|data:)/i.test(trimmed)) {
         return trimmed;
     }
 
-    // 2. Handle Cloudinary specific relative paths if they somehow leak through
-    // (though our backend now sends absolute URLs)
-    if (trimmed.includes('res.cloudinary.com')) {
-        return trimmed.startsWith('//') ? `https:${trimmed}` : trimmed;
+    // 2. Cloudinary protocol-relative URL
+    if (trimmed.startsWith('//')) {
+        return `https:${trimmed}`;
     }
 
-    // 3. Handle local media paths
-    const apiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
-    let baseOrigin = "";
+    // 3. Construct full URL using the bare backend root
+    const backendRoot = (
+        process.env.NEXT_PUBLIC_BACKEND_URL ??
+        (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/api\/v1\/?$/, "")
+    ).replace(/\/$/, "");
 
-    try {
-        if (apiUrl) {
-            const url = new URL(apiUrl);
-            baseOrigin = url.origin;
-        }
-    } catch (e) {
-        baseOrigin = apiUrl.replace(/\/api\/v1\/?$/, "");
-    }
-
-    // Clean the path
+    // Strip leading slashes from the relative path
     let path = trimmed.replace(/^\/+/, "");
 
-    // If it's already a full relative path to media, don't double-prefix
-    if (!path.startsWith("media/") && !path.startsWith("static/") && !path.startsWith("products/media/")) {
+    // 4. Defensive Prefixing: If it doesn't have a common prefix, assume it's a media asset
+    const hasCommonPrefix = /^(media|static|products|uploads|assets)\//i.test(path);
+    if (!hasCommonPrefix) {
         path = `media/${path}`;
     }
 
-    return baseOrigin ? `${baseOrigin}/${path}` : `/${path}`;
+    return backendRoot ? `${backendRoot}/${path}` : `/${path}`;
 }
 
 

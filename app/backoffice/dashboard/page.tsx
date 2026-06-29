@@ -24,35 +24,47 @@ export default function DashboardPage() {
   }, [token, isAuthenticated]);
 
   const kpis = [
-    { label: "Active Orders", value: stats?.active_orders || 0, trend: "Live", color: "text-blue-600" },
-    { label: "Low Stock", value: stats?.low_stock_count || 0, trend: "Requires Action", color: "text-rose-600" },
-    { label: "Revenue (MTD)", value: stats?.monthly_revenue || "NPR 0", trend: "+12.4%", color: "text-emerald-600" },
-    { label: "Active Campaigns", value: stats?.active_campaigns || 0, trend: "Standard", color: "text-fuchsia-600" },
+    { label: "Pending Orders", value: stats?.pending_orders || 0, trend: "Awaiting Action", color: "text-amber-600" },
+    { label: "Today's Intake", value: stats?.today_orders || 0, trend: "24h Volume", color: "text-blue-600" },
+    { label: "Revenue Flow", value: `${stats?.currency || "NPR"} ${stats?.total_revenue || 0}`, trend: "Aggregated", color: "text-emerald-600" },
+    { label: "Low Stock Alerts", value: lowStock.length, trend: "Critical", color: "text-rose-600" },
   ];
 
   type Transaction = DashboardStats["recent_transactions"][number];
 
   const columns: Column<Transaction>[] = [
     {
-      header: "Ref / Transaction",
+      header: "Manifest ID",
       accessor: (t: Transaction) => (
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded bg-slate-50 flex items-center justify-center text-xs">🏷️</div>
-          <span className="font-black text-slate-900 uppercase tracking-widest">{t.id}</span>
+          <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-xs shadow-sm">📦</div>
+          <span className="font-black text-slate-900 uppercase tracking-widest tabular-nums">{t.transaction_id}</span>
         </div>
       )
     },
     {
-      header: "Customer",
-      accessor: "customer"
+      header: "Customer Identity",
+      accessor: (t: Transaction) => (
+        <div className="flex flex-col">
+          <span className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{t.customer_identity}</span>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.items} Items</span>
+        </div>
+      )
     },
     {
-      header: "Amount",
-      accessor: (t: Transaction) => <span className="font-bold text-slate-900">{t.amount}</span>
+      header: "Settlement",
+      accessor: (t: Transaction) => <span className="font-black text-slate-900">Rs {t.settlement}</span>
     },
     {
-      header: "Status",
-      accessor: (t: Transaction) => <StatusBadge status={t.status} />
+      header: "Operational State",
+      accessor: (t: Transaction) => (
+        <div className="flex items-center gap-2">
+          <StatusBadge status={t.lifecycle} />
+          <div className="hidden lg:flex items-center gap-2 text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+            <span>{t.progress}%</span>
+          </div>
+        </div>
+      )
     }
   ];
 
@@ -88,7 +100,7 @@ export default function DashboardPage() {
             isLoading={isLoading}
             data={stats?.recent_transactions || []}
             columns={columns}
-            keyExtractor={(t) => t.id}
+            keyExtractor={(t) => t.transaction_id}
           />
         </div>
 

@@ -19,7 +19,8 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public status: number,
-    public loginHint?: string
+    public loginHint?: string,
+    public data?: Record<string, any>
   ) {
     super(message);
     this.name = "ApiError";
@@ -88,6 +89,8 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     const message = extractedMessage || response.statusText || "API request failed";
     const code = errorData?.code || (response.status === 401 ? "UNAUTHORIZED" : "UNKNOWN_ERROR");
     const loginHint = errorData?.login_hint;
+    // Carry the backend field-level validation errors (e.g. { payment_type: ["required"] })
+    const fieldData = errorData?.data ?? null;
 
     // Log specifics if it's an auth failure to help debugging
     if (response.status === 401 || code === "NOT_AUTHENTICATED") {
@@ -97,7 +100,7 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
       }
     }
 
-    throw new ApiError(code, message, response.status, loginHint);
+    throw new ApiError(code, message, response.status, loginHint, fieldData);
   }
 
   // Pagination-Aware Unwrapping: 

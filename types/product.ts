@@ -9,10 +9,12 @@ export interface ProductMedia {
 }
 
 export interface ProductVariant {
+  color: string | undefined;
   id: string;
   sku: string;
   size: string;
-  color: string;
+  name?: string;
+  image_id?: string;
   price: string;
   is_active: boolean;
   available_quantity: number;
